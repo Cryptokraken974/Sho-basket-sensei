@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from basketvision_coach.court_calibration import (
+    CalibrationPointPair,
+    CourtCalibrationService,
+    CourtLandmark,
+    ImagePoint,
+)
 from basketvision_coach.cv_pipeline import (
     BoundingBox,
     CourtPoint,
@@ -71,6 +77,47 @@ def test_detection_job_creates_versioned_run_and_appends_detections() -> None:
     assert [d.class_name for d in store.list_detections(first.run_id)] == ["player", "ball"]
     assert len(store.list_detections(second.run_id)) == 2
     assert len(store.list_detections(first.run_id)) == 2, "new model runs preserve earlier outputs"
+
+
+def test_detection_and_track_outputs_project_pixels_with_active_calibration() -> None:
+    calibration = CourtCalibrationService()
+    calibration.create_calibration(
+        video_id="game-1",
+        point_pairs=[
+            CalibrationPointPair(CourtLandmark.BASELINE_LEFT_SIDELINE, ImagePoint(0, 0), 0, 0),
+            CalibrationPointPair(CourtLandmark.BASELINE_RIGHT_SIDELINE, ImagePoint(100, 0), 94, 0),
+            CalibrationPointPair(
+                CourtLandmark.OPPOSITE_BASELINE_RIGHT_SIDELINE, ImagePoint(100, 100), 94, 50
+            ),
+            CalibrationPointPair(
+                CourtLandmark.OPPOSITE_BASELINE_LEFT_SIDELINE, ImagePoint(0, 100), 0, 50
+            ),
+        ],
+        valid_from_s=0.0,
+        valid_to_s=None,
+        created_by="coach@example.com",
+    )
+    store = InMemoryVisionStore()
+    pipeline = VisionPipeline(store=store, calibration_service=calibration)
+
+    detection = pipeline.run_detection(
+        DetectionJobSpec(
+            video_id="game-1",
+            model=ModelSpec(name="yolo-basket", version="2026.06.1"),
+            confidence_threshold=0.5,
+            frame_detections=[
+                [DetectionCandidate(0, 2.0, "player", 0.9, BoundingBox(40, 40, 20, 20))]
+            ],
+        )
+    )
+    tracking = pipeline.run_tracking(
+        TrackingJobSpec(video_id="game-1", detection_run_id=detection.run_id)
+    )
+
+    detected = store.list_detections(detection.run_id)[0]
+    tracked = store.list_tracks(tracking.run_id)[0]
+    assert detected.court_coordinates == CourtPoint(x=47.0, y=25.0)
+    assert tracked.court_coordinates == CourtPoint(x=47.0, y=25.0)
 
 
 def test_tracking_job_consumes_detection_run_and_writes_stable_player_tracks() -> None:

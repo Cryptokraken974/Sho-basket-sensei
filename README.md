@@ -8,6 +8,7 @@ The initial package focuses on a small, typed domain model that can be expanded 
 - score release angle, elbow alignment, follow-through, and balance
 - run versioned CV detection jobs for player, ball, hoop, backboard, and referee objects
 - run deterministic player tracking jobs from persisted detections
+- calibrate video pixels to court coordinates using coach-labeled court landmarks
 - expose job progress and overlay toggles for API/UI integration
 - expose a lightweight CLI for smoke testing
 
@@ -30,6 +31,17 @@ uv run ruff check .
 - progress snapshots include stage, frame bounds, processing FPS, warnings, and status for API responses
 - `OverlayOptions` lets the UI independently show or hide detection boxes, track trails, and ball path overlays
 - `WorkerRuntime` validates `DEVICE=cpu` or `DEVICE=mps` and carries native-worker connections to the Dockerized API, Redis, and shared storage
+
+## Court calibration and projection
+
+`basketvision_coach.court_calibration` models the calibration API/UI contract:
+
+- the calibration page starts from a `FrameCapture` and lets a coach place labeled landmarks on the captured frame
+- supported landmark labels include baseline/sideline intersections, free-throw line intersections, center-circle references, and three-point arc references
+- `CourtCalibrationService.create_calibration` validates at least four unique point pairs, computes a homography, and appends a `court_calibrations`-style record with `image_points_json`, `court_points_json`, `homography_json`, `valid_from_s`, `valid_to_s`, and `created_by`
+- `project_point` uses the active calibration for a video timestamp to return `court_x` and `court_y`
+- `overlay_projection_payload` returns a court map plus projected test points for the video overlay
+- replacing calibration means appending another validity-ranged record; prior records remain queryable
 
 ## CLI
 

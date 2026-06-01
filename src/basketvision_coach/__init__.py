@@ -1,6 +1,19 @@
 """BasketVision Coach public API."""
 
 from basketvision_coach.coach import CoachFeedback, ShotObservation, assess_shot
+from basketvision_coach.court_calibration import (
+    CalibrationDraft,
+    CalibrationPointPair,
+    CourtCalibrationRecord,
+    CourtCalibrationService,
+    CourtLandmark,
+    FrameCapture,
+    ImagePoint,
+    OverlayCourtMap,
+    ProjectablePoint,
+    ProjectedCourtPoint,
+    active_supported_landmark_labels,
+)
 from basketvision_coach.cv_pipeline import (
     BoundingBox,
     CourtPoint,
@@ -22,22 +35,33 @@ from basketvision_coach.cv_pipeline import (
 
 __all__ = [
     "BoundingBox",
+    "CalibrationDraft",
+    "CalibrationPointPair",
     "CoachFeedback",
+    "CourtCalibrationRecord",
+    "CourtCalibrationService",
+    "CourtLandmark",
     "CourtPoint",
     "DetectionCandidate",
     "DetectionJobSpec",
     "DetectionRecord",
+    "FrameCapture",
+    "ImagePoint",
     "InMemoryVisionStore",
     "JobProgress",
     "ModelSpec",
+    "OverlayCourtMap",
     "OverlayOptions",
     "PipelineResult",
     "ProcessingRun",
+    "ProjectablePoint",
+    "ProjectedCourtPoint",
     "ShotObservation",
     "TrackRecord",
     "TrackingJobSpec",
     "VisionPipeline",
     "WorkerConnections",
     "WorkerRuntime",
+    "active_supported_landmark_labels",
     "assess_shot",
 ]
