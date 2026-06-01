@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from math import hypot
 from time import perf_counter
-from typing import Any, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 from uuid import uuid4
 
 from basketvision_coach.court_calibration import ProjectedCourtPoint
@@ -23,6 +23,9 @@ RunStatus = Literal["queued", "running", "succeeded", "failed"]
 Device = Literal["cpu", "mps"]
 
 SUPPORTED_CLASSES = frozenset({"player", "ball", "hoop", "backboard", "referee"})
+
+if TYPE_CHECKING:
+    from basketvision_coach.shots import ShotCandidateDetectionSpec, ShotEvent
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,6 +253,7 @@ class InMemoryVisionStore:
         self._detections: dict[str, list[DetectionRecord]] = {}
         self._tracks: dict[str, list[TrackRecord]] = {}
         self._progress: dict[str, JobProgress] = {}
+        self._shot_events: dict[str, ShotEvent] = {}
 
     def create_run(
         self,
@@ -324,6 +328,40 @@ class InMemoryVisionStore:
 
     def get_progress(self, run_id: str) -> JobProgress:
         return self._progress[run_id]
+
+    def detect_shot_attempts(self, spec: ShotCandidateDetectionSpec) -> list[ShotEvent]:
+        from basketvision_coach.shots import detect_shot_attempts
+
+        events = detect_shot_attempts(
+            detections=self.list_detections(spec.detection_run_id),
+            tracks=self.list_tracks(spec.tracking_run_id),
+            spec=spec,
+        )
+        for event in events:
+            self._shot_events[event.event_id] = event
+        return events
+
+    def list_shot_events(self) -> list[ShotEvent]:
+        return list(self._shot_events.values())
+
+    def get_shot_event(self, event_id: str) -> ShotEvent:
+        try:
+            return self._shot_events[event_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown shot event: {event_id}") from exc
+
+    def update_shot_event(self, event: ShotEvent) -> ShotEvent:
+        self.get_shot_event(event.event_id)
+        self._shot_events[event.event_id] = event
+        return event
+
+    def lock_shot_event(self, event_id: str) -> ShotEvent:
+        from dataclasses import replace
+
+        event = self.get_shot_event(event_id)
+        if event.status != "reviewed":
+            raise ValueError("only reviewed shot events can be locked")
+        return self.update_shot_event(replace(event, status="locked"))
 
 
 class VisionPipeline:
