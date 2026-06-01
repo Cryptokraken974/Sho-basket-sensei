@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -20,6 +21,10 @@ def build_session_factory(database_url: str | None = None) -> sessionmaker[Sessi
     connect_args: dict[str, object] = {}
     if url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
+        if ":memory:" not in url:
+            database_path = url.removeprefix("sqlite+pysqlite:///").removeprefix("sqlite:///")
+            if database_path:
+                Path(database_path).parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(url, connect_args=connect_args)
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)
