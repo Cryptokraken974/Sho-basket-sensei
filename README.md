@@ -6,7 +6,9 @@ The initial package focuses on a small, typed domain model that can be expanded 
 
 - capture normalized shot observations
 - score release angle, elbow alignment, follow-through, and balance
-- return prioritized coaching cues
+- run versioned CV detection jobs for player, ball, hoop, backboard, and referee objects
+- run deterministic player tracking jobs from persisted detections
+- expose job progress and overlay toggles for API/UI integration
 - expose a lightweight CLI for smoke testing
 
 ## Quick start
@@ -17,6 +19,17 @@ uv run pytest
 uv run mypy src tests
 uv run ruff check .
 ```
+
+## CV processing pipeline
+
+`basketvision_coach.cv_pipeline` contains dependency-light contracts for the planned video worker:
+
+- detection runs persist `processing_run` metadata with model name/version, optional weights hash, confidence threshold, device, calibration ID, status, and timestamps
+- detection records store frame index, timestamp, class, confidence, bounding box, and optional court coordinates without deleting earlier runs
+- tracking runs consume a detection run and write per-frame player tracks with stable `track_id` values for that tracking run
+- progress snapshots include stage, frame bounds, processing FPS, warnings, and status for API responses
+- `OverlayOptions` lets the UI independently show or hide detection boxes, track trails, and ball path overlays
+- `WorkerRuntime` validates `DEVICE=cpu` or `DEVICE=mps` and carries native-worker connections to the Dockerized API, Redis, and shared storage
 
 ## CLI
 
