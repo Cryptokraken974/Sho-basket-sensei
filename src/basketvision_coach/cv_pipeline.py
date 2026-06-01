@@ -14,8 +14,10 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from math import hypot
 from time import perf_counter
-from typing import Any, Literal, cast
+from typing import Any, Literal, Protocol, cast
 from uuid import uuid4
+
+from basketvision_coach.court_calibration import ProjectedCourtPoint
 
 RunStatus = Literal["queued", "running", "succeeded", "failed"]
 Device = Literal["cpu", "mps"]
@@ -232,6 +234,14 @@ class WorkerRuntime:
         )
 
 
+class CalibrationProjector(Protocol):
+    """Projection contract supplied by the calibration API/service."""
+
+    def project_point(
+        self, *, video_id: str, image_x: float, image_y: float, ts_s: float
+    ) -> ProjectedCourtPoint: ...
+
+
 class InMemoryVisionStore:
     """Small repository that mirrors the eventual API database contract."""
 
@@ -319,8 +329,11 @@ class InMemoryVisionStore:
 class VisionPipeline:
     """Runs detector and tracker jobs while preserving versioned outputs."""
 
-    def __init__(self, store: InMemoryVisionStore) -> None:
+    def __init__(
+        self, store: InMemoryVisionStore, calibration_service: CalibrationProjector | None = None
+    ) -> None:
         self._store = store
+        self._calibration_service = calibration_service
 
     def run_detection(self, spec: DetectionJobSpec) -> PipelineResult:
         start = perf_counter()
@@ -347,7 +360,9 @@ class VisionPipeline:
                 if candidate.confidence < spec.confidence_threshold:
                     dropped_count += 1
                     continue
-                self._store.add_detection(run.run_id, candidate)
+                self._store.add_detection(
+                    run.run_id, self._with_projected_coordinates(spec.video_id, candidate)
+                )
         if dropped_count:
             warnings.append(f"dropped {dropped_count} detections below confidence threshold")
         self._store.finish_run(run.run_id, "succeeded")
@@ -409,6 +424,22 @@ class VisionPipeline:
 
     def get_job_progress(self, run_id: str) -> JobProgress:
         return self._store.get_progress(run_id)
+
+    def _with_projected_coordinates(
+        self, video_id: str, candidate: DetectionCandidate
+    ) -> DetectionCandidate:
+        if candidate.court_coordinates is not None or self._calibration_service is None:
+            return candidate
+        projected = self._calibration_service.project_point(
+            video_id=video_id,
+            image_x=candidate.bbox.center[0],
+            image_y=candidate.bbox.center[1],
+            ts_s=candidate.ts_s,
+        )
+        return replace(
+            candidate,
+            court_coordinates=CourtPoint(x=projected.court_x, y=projected.court_y),
+        )
 
     def _progress(
         self,
