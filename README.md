@@ -31,9 +31,54 @@ so missing runtime dependencies are caught before merge.
 uv run uvicorn basketvision_coach.api:app --reload
 ```
 
-Then open <http://localhost:8000/>. The data directory (SQLite database and
-stored video assets) defaults to `./data` and `DATABASE_URL` overrides the
-database location.
+Then open <http://localhost:8000/> (interactive API docs at `/docs`). uvicorn
+binds `127.0.0.1:8000` by default.
+
+### Configuration
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `DATA_ROOT` | `data` | Directory for the SQLite db and stored/transcoded video assets. |
+| `DATABASE_URL` | `sqlite:///<DATA_ROOT>/basketvision.db` | Override the database (e.g. Postgres). |
+
+### Changing host / port
+
+`uvicorn` controls the bind address; there is no port baked into the code:
+
+```bash
+uv run uvicorn basketvision_coach.api:app --port 9000              # http://127.0.0.1:9000/
+uv run uvicorn basketvision_coach.api:app --host 0.0.0.0 --port 9000   # reachable from other hosts
+```
+
+For platforms that inject a `PORT` env var (Render, Railway, Cloud Run, Heroku):
+
+```bash
+uv run uvicorn basketvision_coach.api:app --host 0.0.0.0 --port ${PORT:-8000}
+```
+
+### Production-style (multiple workers)
+
+```bash
+uv run uvicorn basketvision_coach.api:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+### Docker
+
+A `Dockerfile` (with ffmpeg) and `docker-compose.yml` (persistent `/data`
+volume) are included:
+
+```bash
+docker build -t sensei .
+docker run --rm -p 8000:8000 -v sensei-data:/data sensei
+
+# or, with compose (host port overridable):
+docker compose up --build
+SENSEI_PORT=9000 docker compose up        # serve on http://localhost:9000/
+```
+
+The container reads `PORT` (default 8000) and stores everything under the
+`/data` volume. The optional CV runtime (YOLO/SAM 2) is not baked into the
+image to keep it light — add it in a derived image if you need those buttons.
 
 ### UI
 

@@ -1,0 +1,15 @@
+services:
+  sensei:
+    build: .
+    # Host port is configurable: SENSEI_PORT=9000 docker compose up
+    ports:
+      - "${SENSEI_PORT:-8000}:8000"
+    environment:
+      - PORT=8000
+      - DATA_ROOT=/data
+    volumes:
+      - sensei-data:/data
+    restart: unless-stopped
+
+volumes:
+  sensei-data:

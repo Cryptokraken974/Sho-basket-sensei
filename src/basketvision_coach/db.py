@@ -12,8 +12,21 @@ class Base(DeclarativeBase):
     pass
 
 
+def data_root_from_env() -> Path:
+    """Root directory for stored video assets and the default SQLite database.
+
+    Defaults to ``./data`` so the database and video files live together and are
+    writable without root; override with ``DATA_ROOT`` (e.g. a mounted volume).
+    """
+
+    return Path(os.environ.get("DATA_ROOT", "data"))
+
+
 def database_url_from_env() -> str:
-    return os.environ.get("DATABASE_URL", "sqlite:///data/basketvision.db")
+    explicit = os.environ.get("DATABASE_URL")
+    if explicit:
+        return explicit
+    return f"sqlite:///{data_root_from_env() / 'basketvision.db'}"
 
 
 def _ensure_sqlite_parent(url: str) -> None:

@@ -38,7 +38,7 @@ from basketvision_coach.cv_pipeline import (
     TrackingJobSpec,
     VisionPipeline,
 )
-from basketvision_coach.db import build_session_factory
+from basketvision_coach.db import build_session_factory, data_root_from_env
 from basketvision_coach.demo_data import DEMO_HEIGHT, DEMO_WIDTH, generate_demo_frames
 from basketvision_coach.identity import (
     IdentityReviewService,
@@ -80,7 +80,10 @@ _STATIC_DIR = _PACKAGE_DIR / "static"
 
 
 def default_service() -> VideoIngestService:
-    return VideoIngestService(session_factory=build_session_factory())
+    return VideoIngestService(
+        session_factory=build_session_factory(),
+        data_root=data_root_from_env(),
+    )
 
 
 def video_to_read(video: Video) -> VideoRead:

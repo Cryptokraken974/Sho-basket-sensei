@@ -137,7 +137,7 @@ class VideoIngestService:
     def __init__(
         self,
         session_factory: sessionmaker[Session],
-        data_root: Path = Path("/data"),
+        data_root: Path = Path("data"),
         transcode_runner: TranscodeRunner = run_ffmpeg_transcode,
         create_hls: bool = True,
     ) -> None:
