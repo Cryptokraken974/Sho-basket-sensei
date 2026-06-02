@@ -145,6 +145,13 @@ On MPS, `PYTORCH_ENABLE_MPS_FALLBACK=1` is set automatically for SAM 2 so ops
 without Metal kernels fall back to CPU. SAM 2 is memory-heavy — prefer short
 clips on smaller machines.
 
+**Preflight check.** Validate the CV setup (device, torch/ultralytics/opencv/sam2
+imports, and the configured SAM 2 checkpoint/config) in one command:
+
+```bash
+uv run python -m basketvision_coach.checkcv
+```
+
 ### HTTP API
 
 In addition to the pages, the app exposes JSON endpoints consumed by the UI
