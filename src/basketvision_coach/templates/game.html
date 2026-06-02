@@ -22,6 +22,16 @@
       <input type="file" name="file" accept="video/mp4" required />
       <button type="submit" :disabled="uploading" x-text="uploading ? 'Uploading…' : 'Upload'"></button>
     </form>
+
+    <div class="sample-loader" x-show="samples.length">
+      <span class="muted">No footage? Load a bundled sample:</span>
+      <select x-model="selectedSample">
+        <template x-for="s in samples" :key="s"><option :value="s" x-text="s"></option></template>
+      </select>
+      <button class="secondary" @click="loadSample()" :disabled="uploading"
+              x-text="uploading ? 'Loading…' : 'Load sample'"></button>
+    </div>
+
     <p class="error" x-show="error" x-text="error"></p>
   </section>
 

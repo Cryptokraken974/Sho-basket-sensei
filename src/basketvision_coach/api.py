@@ -54,6 +54,7 @@ from basketvision_coach.review import (
     ReviewEventCreate,
     ReviewStore,
 )
+from basketvision_coach.samples import list_sample_videos, resolve_sample
 from basketvision_coach.schemas import (
     AnalysisRead,
     CalibrationCreate,
@@ -75,6 +76,7 @@ from basketvision_coach.schemas import (
     ReviewEventRead,
     ReviewEventUpdate,
     RunRead,
+    SampleIngest,
     TeamCreate,
     TeamRead,
     TrackIdentityAssign,
@@ -180,6 +182,7 @@ def create_app(
     analyzer: VideoAnalyzer | None = None,
     click_tracker: ClickTracker | None = None,
     review_store: ReviewStore | None = None,
+    samples_directory: Path | None = None,
 ) -> FastAPI:
     if service is not None and video_service is not None:
         raise ValueError("pass either service or video_service, not both")
@@ -235,6 +238,33 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         if not process_inline:
             background_tasks.add_task(video_service.transcode_video, video.id)
+        return video_to_read(video)
+
+    @app.get("/api/samples", response_model=list[str])
+    def list_samples() -> list[str]:
+        return list_sample_videos(samples_directory)
+
+    @app.post(
+        "/api/games/{game_id}/video/from-sample",
+        response_model=VideoRead,
+        status_code=201,
+    )
+    def ingest_sample_video(
+        game_id: int, payload: SampleIngest, background_tasks: BackgroundTasks
+    ) -> VideoRead:
+        sample_path = resolve_sample(payload.filename, samples_directory)
+        if sample_path is None:
+            raise HTTPException(status_code=404, detail="Sample not found")
+        try:
+            with sample_path.open("rb") as handle:
+                video = video_service.ingest_game_video(
+                    game_id, sample_path.name, handle, run_transcode=False
+                )
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        background_tasks.add_task(video_service.transcode_video, video.id)
         return video_to_read(video)
 
     @app.get("/api/games/{game_id}/video", response_model=VideoRead)

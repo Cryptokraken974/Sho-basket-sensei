@@ -53,6 +53,8 @@ window.bvGamePage = function (config) {
     clickLabel: "Player 1",
     clickPrompts: [],
     clickTracking: false,
+    samples: [],
+    selectedSample: "",
 
     fmt: fmtNumber,
 
@@ -75,6 +77,39 @@ window.bvGamePage = function (config) {
 
     async init() {
       if (this.videoId) await this.refresh();
+      try {
+        const res = await fetch("/api/samples");
+        if (res.ok) {
+          this.samples = await res.json();
+          this.selectedSample = this.samples[0] || "";
+        }
+      } catch (e) {
+        /* samples are optional */
+      }
+    },
+
+    async loadSample() {
+      if (!this.selectedSample) return;
+      this.uploading = true;
+      this.error = "";
+      try {
+        const res = await fetch(`/api/games/${this.gameId}/video/from-sample`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: this.selectedSample }),
+        });
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.detail || `Load failed (${res.status})`);
+        }
+        this.video = await res.json();
+        this.videoId = this.video.id;
+        this.schedulePoll();
+      } catch (e) {
+        this.error = String(e.message || e);
+      } finally {
+        this.uploading = false;
+      }
     },
 
     async refresh() {

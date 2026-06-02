@@ -11,6 +11,10 @@ class GameCreate(BaseModel):
     name: str
 
 
+class SampleIngest(BaseModel):
+    filename: str
+
+
 class GameRead(BaseModel):
     id: int
     name: str
