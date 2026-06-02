@@ -11,7 +11,10 @@ runs where ``sam2``/``torch`` are installed.
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable, Sequence
+import subprocess
+import tempfile
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -220,16 +223,28 @@ class Sam2ClickTracker:
         labels_by_id = {v: k for k, v in track_ids.items()}
         fps = self.probe(video_path).fps
 
-        state = predictor.init_state(video_path=str(video_path))
-        for prompt in prompts:
-            predictor.add_new_points_or_box(
-                inference_state=state,
-                frame_idx=prompt.frame_idx,
-                obj_id=track_ids[prompt.object_label],
-                points=[[prompt.x, prompt.y]],
-                labels=[1],
-            )
+        # SAM 2's video predictor reads a directory of 0-indexed JPEG frames
+        # (direct video-file input needs the optional `decord` backend), so
+        # extract frames first.
+        with _extracted_frames(video_path) as frames_dir:
+            state = predictor.init_state(video_path=str(frames_dir))
+            for prompt in prompts:
+                predictor.add_new_points_or_box(
+                    inference_state=state,
+                    frame_idx=prompt.frame_idx,
+                    obj_id=track_ids[prompt.object_label],
+                    points=[[prompt.x, prompt.y]],
+                    labels=[1],
+                )
+            yield from self._emit_frames(predictor, state, labels_by_id, fps)
 
+    def _emit_frames(
+        self,
+        predictor: Any,
+        state: Any,
+        labels_by_id: dict[int, str],
+        fps: float,
+    ) -> Iterable[FrameDetections]:  # pragma: no cover - needs models
         for frame_idx, obj_ids, mask_logits in predictor.propagate_in_video(state):
             objects: list[DetectedObject] = []
             for obj_id, logits in zip(obj_ids, mask_logits, strict=True):
@@ -254,6 +269,33 @@ class Sam2ClickTracker:
                 ts_s=frame_idx / fps if fps else 0.0,
                 objects=tuple(objects),
             )
+
+
+@contextmanager
+def _extracted_frames(video_path: Path) -> Iterator[Path]:  # pragma: no cover - needs ffmpeg
+    """Extract a video into a temp dir of 0-indexed JPEG frames for SAM 2."""
+
+    with tempfile.TemporaryDirectory(prefix="sam2_frames_") as tmp:
+        frames_dir = Path(tmp)
+        completed = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(video_path),
+                "-q:v",
+                "2",
+                "-start_number",
+                "0",
+                str(frames_dir / "%05d.jpg"),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if completed.returncode != 0:
+            tail = "\n".join((completed.stderr or "").strip().splitlines()[-6:])
+            raise RuntimeError(f"ffmpeg frame extraction failed: {tail or completed.returncode}")
+        yield frames_dir
 
 
 def build_default_click_tracker() -> Sam2ClickTracker:
