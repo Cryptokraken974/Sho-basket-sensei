@@ -515,9 +515,14 @@ def create_app(
             chosen = analyzer or load_default_analyzer()
         except AnalyzerUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
-        result = run_analysis(
-            store, video_id=video_id, video_path=Path(source), analyzer=chosen
-        )
+        try:
+            result = run_analysis(
+                store, video_id=video_id, video_path=Path(source), analyzer=chosen
+            )
+        except AnalyzerUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:  # surface the real inference error to the UI
+            raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}") from exc
         return AnalysisRead(
             detection_run_id=result.detection_run_id,
             tracking_run_id=result.tracking_run_id,
@@ -562,6 +567,10 @@ def create_app(
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except AnalyzerUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:  # surface the real tracking error to the UI
+            raise HTTPException(status_code=500, detail=f"Click-tracking failed: {exc}") from exc
         return AnalysisRead(
             detection_run_id=result.detection_run_id,
             tracking_run_id=result.tracking_run_id,

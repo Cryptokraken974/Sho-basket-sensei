@@ -143,6 +143,8 @@ def run_analysis(
     for frame in analyzer.detect_and_track(video_path):
         frame_count = max(frame_count, frame.frame_idx + 1)
         for obj in frame.objects:
+            if obj.width <= 0 or obj.height <= 0:
+                continue  # YOLO can emit a degenerate box; BoundingBox requires >0
             record = store.add_detection(
                 detection_run.run_id,
                 DetectionCandidate(
