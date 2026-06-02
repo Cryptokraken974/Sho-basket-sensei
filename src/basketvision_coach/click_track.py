@@ -32,8 +32,9 @@ from basketvision_coach.cv_pipeline import (
 )
 
 SAM_INSTALL_HINT = (
-    "Click-to-track needs SAM 2. Install it with `pip install sam2 torch "
-    "opencv-python-headless` (GPU/MPS recommended) and download a SAM 2 checkpoint."
+    "Click-to-track needs SAM 2. Install it with `uv pip install sam2 torch "
+    "opencv-python-headless` (Apple Silicon: set DEVICE=mps), download a checkpoint, "
+    "and point SAM2_CHECKPOINT / SAM2_CONFIG at it."
 )
 
 
@@ -255,9 +256,18 @@ class Sam2ClickTracker:
             )
 
 
+def build_default_click_tracker() -> Sam2ClickTracker:
+    """Construct the SAM 2 tracker from env (checkpoint/config), without loading it."""
+
+    return Sam2ClickTracker(
+        checkpoint=os.environ.get("SAM2_CHECKPOINT", "sam2_hiera_small.pt"),
+        model_cfg=os.environ.get("SAM2_CONFIG", "sam2_hiera_s.yaml"),
+    )
+
+
 def load_default_click_tracker() -> ClickTracker:
     """Return the SAM 2 tracker, or raise :class:`AnalyzerUnavailable`."""
 
-    tracker = Sam2ClickTracker()
+    tracker = build_default_click_tracker()
     tracker._build_predictor()
     return tracker

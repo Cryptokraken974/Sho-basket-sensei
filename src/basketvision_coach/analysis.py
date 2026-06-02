@@ -290,10 +290,16 @@ def _iter_boxes(boxes: object) -> Iterable[_Box]:  # pragma: no cover - needs mo
         )
 
 
+def build_default_analyzer() -> YoloByteTrackAnalyzer:
+    """Construct the YOLO analyzer from env (YOLO_MODEL), without loading weights."""
+
+    return YoloByteTrackAnalyzer(model_name=os.environ.get("YOLO_MODEL", "yolov8n.pt"))
+
+
 def load_default_analyzer() -> VideoAnalyzer:
     """Return the default real analyzer, or raise :class:`AnalyzerUnavailable`."""
 
-    analyzer = YoloByteTrackAnalyzer()
+    analyzer = build_default_analyzer()
     # Surface a missing runtime eagerly with a friendly message.
     analyzer._load_model()
     return analyzer

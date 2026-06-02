@@ -41,6 +41,9 @@ binds `127.0.0.1:8000` by default.
 | `DATA_ROOT` | `data` | Directory for the SQLite db and stored/transcoded video assets. |
 | `DATABASE_URL` | `sqlite:///<DATA_ROOT>/basketvision.db` | Override the database (e.g. Postgres). |
 | `DEVICE` | auto (`cuda`→`mps`→`cpu`) | torch device for the YOLO/SAM 2 runtimes. |
+| `YOLO_MODEL` | `yolov8n.pt` | YOLO weights for the analysis endpoint. |
+| `SAM2_CHECKPOINT` | `sam2_hiera_small.pt` | Path to the SAM 2 checkpoint for click-to-track. |
+| `SAM2_CONFIG` | `sam2_hiera_s.yaml` | SAM 2 model config matching the checkpoint. |
 
 ### Changing host / port
 
