@@ -127,9 +127,9 @@ def test_api_upload_creates_video_record_and_player_uses_proxy(tmp_path: Path) -
 
     page = client.get(f"/games/{game_id}")
     assert page.status_code == 200
-    assert "Processing state" in page.text
-    assert "proxy_720p.mp4" in page.text
+    assert "Corner threes" in page.text
     assert "<video" in page.text
+    assert "/static/app.js" in page.text
 
     playable = client.get(body["proxy_url"])
     assert playable.status_code == 200

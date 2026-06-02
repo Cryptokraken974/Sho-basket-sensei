@@ -147,3 +147,42 @@ class JobProgressRead(BaseModel):
 class RunRead(BaseModel):
     run_id: str
     progress: JobProgressRead
+
+
+class BoundingBoxRead(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+class CourtPointRead(BaseModel):
+    x: float
+    y: float
+
+
+class DetectionRecordRead(BaseModel):
+    detection_id: str
+    run_id: str
+    frame_idx: int
+    ts_s: float
+    class_name: str
+    confidence: float
+    bbox: BoundingBoxRead
+    court_coordinates: CourtPointRead | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TrackRecordRead(BaseModel):
+    track_row_id: str
+    run_id: str
+    track_id: int
+    frame_idx: int
+    ts_s: float
+    class_name: str
+    confidence: float
+    bbox: BoundingBoxRead
+    court_coordinates: CourtPointRead | None = None
+
+    model_config = ConfigDict(from_attributes=True)

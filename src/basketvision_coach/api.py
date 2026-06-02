@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from basketvision_coach.court_calibration import (
     CalibrationPointPair,
@@ -28,6 +30,7 @@ from basketvision_coach.db import build_session_factory
 from basketvision_coach.schemas import (
     CalibrationCreate,
     CalibrationRead,
+    DetectionRecordRead,
     DetectionRunCreate,
     GameCreate,
     GameRead,
@@ -37,10 +40,15 @@ from basketvision_coach.schemas import (
     ProjectRequest,
     RunRead,
     TrackingRunCreate,
+    TrackRecordRead,
     VideoRead,
 )
 from basketvision_coach.video import VideoIngestService
-from basketvision_coach.video_models import Game, Video, VideoState
+from basketvision_coach.video_models import Video, VideoState
+
+_PACKAGE_DIR = Path(__file__).resolve().parent
+_TEMPLATES = Jinja2Templates(directory=str(_PACKAGE_DIR / "templates"))
+_STATIC_DIR = _PACKAGE_DIR / "static"
 
 
 def default_service() -> VideoIngestService:
@@ -84,6 +92,7 @@ def create_app(
     calibration = calibration_service or CourtCalibrationService()
     store = vision_store or InMemoryVisionStore()
     app = FastAPI(title="BasketVision Coach")
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     # --- Games ----------------------------------------------------------------
 
@@ -307,68 +316,66 @@ def create_app(
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="run not found") from exc
 
-    # --- Minimal server-rendered pages (replaced by templated UI in P2) -------
+    @app.get("/api/runs/{run_id}/detections", response_model=list[DetectionRecordRead])
+    def list_run_detections(run_id: str) -> list[DetectionRecordRead]:
+        return [
+            DetectionRecordRead.model_validate(record, from_attributes=True)
+            for record in store.list_detections(run_id)
+        ]
+
+    @app.get("/api/runs/{run_id}/tracks", response_model=list[TrackRecordRead])
+    def list_run_tracks(run_id: str) -> list[TrackRecordRead]:
+        return [
+            TrackRecordRead.model_validate(record, from_attributes=True)
+            for record in store.list_tracks(run_id)
+        ]
+
+    # --- HTML pages (Jinja2 + htmx + Alpine) ----------------------------------
+
+    @app.get("/", response_class=HTMLResponse)
+    def index(request: Request) -> HTMLResponse:
+        games = video_service.list_games()
+        return _TEMPLATES.TemplateResponse(request, "index.html", {"games": games})
+
+    @app.post("/games", response_class=HTMLResponse)
+    def create_game_form(request: Request, name: Annotated[str, Form()]) -> HTMLResponse:
+        try:
+            video_service.create_game(name)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        games = video_service.list_games()
+        # htmx swaps in just the refreshed list; a full-page form post still works too.
+        if request.headers.get("HX-Request"):
+            return _TEMPLATES.TemplateResponse(request, "_game_list.html", {"games": games})
+        return _TEMPLATES.TemplateResponse(request, "index.html", {"games": games})
 
     @app.get("/games/{game_id}", response_class=HTMLResponse)
-    def game_page(game_id: int) -> HTMLResponse:
+    def game_page(request: Request, game_id: int) -> HTMLResponse:
         game = video_service.get_game(game_id)
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         video = video_service.latest_video_for_game(game_id)
-        return HTMLResponse(render_game_page(game, video))
-
-    @app.get("/", response_class=HTMLResponse)
-    def index() -> HTMLResponse:
-        games = video_service.list_games()
-        items = "".join(
-            f'<li><a href="/games/{game.id}">{escape(game.name)}</a></li>' for game in games
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "game.html",
+            {"game": game, "video": video_to_read(video) if video else None},
         )
-        return HTMLResponse(f"<h1>BasketVision Coach</h1><ul>{items}</ul>")
+
+    @app.get("/games/{game_id}/calibrate", response_class=HTMLResponse)
+    def calibration_page(request: Request, game_id: int) -> HTMLResponse:
+        game = video_service.get_game(game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        video = video_service.latest_video_for_game(game_id)
+        if video is None or video.state is not VideoState.READY:
+            raise HTTPException(status_code=409, detail="A ready video is required to calibrate")
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "calibration.html",
+            {"game": game, "video": video_to_read(video)},
+        )
 
     return app
-
-
-def escape(value: str) -> str:
-    return (
-        value.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-    )
-
-
-def render_game_page(game: Game, video: Video | None) -> str:
-    if video is None:
-        state = "No upload"
-        player = "<p>No video uploaded yet.</p>"
-        metadata = ""
-    else:
-        state = video.state.value
-        if video.state is VideoState.READY and video.proxy_path:
-            proxy_url = f"/api/videos/{video.id}/proxy_720p.mp4"
-            player = f'<video controls src="{proxy_url}" style="max-width: 100%;"></video>'
-        elif video.state is VideoState.FAILED:
-            player = f"<p>Transcode failed: {escape(video.error_message or 'unknown error')}</p>"
-        else:
-            player = "<p>Video is processing. Refresh shortly.</p>"
-        metadata = (
-            f"<dl><dt>Duration</dt><dd>{video.duration_s or ''}</dd>"
-            f"<dt>FPS</dt><dd>{video.fps or ''}</dd>"
-            f"<dt>Dimensions</dt><dd>{video.width or ''}x{video.height or ''}</dd>"
-            "<dt>Timestamp mapping</dt><dd>ts_s = frame_idx / fps</dd></dl>"
-        )
-    return f"""
-    <!doctype html>
-    <html>
-      <head><title>{escape(game.name)} - BasketVision Coach</title></head>
-      <body>
-        <h1>{escape(game.name)}</h1>
-        <p>Processing state: <strong>{escape(state)}</strong></p>
-        {player}
-        {metadata}
-      </body>
-    </html>
-    """
 
 
 app = create_app()

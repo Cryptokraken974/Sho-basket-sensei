@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Games · BasketVision Coach{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>Games</h1>
+  <p class="muted">Create a game, then upload a match video to analyze.</p>
+
+  <form class="inline-form" method="post" action="/games" hx-post="/games"
+        hx-target="#game-list" hx-swap="outerHTML" hx-on::after-request="this.reset()">
+    <input type="text" name="name" placeholder="New game name" required maxlength="200" />
+    <button type="submit">Create game</button>
+  </form>
+
+  {% include "_game_list.html" %}
+</section>
+{% endblock %}

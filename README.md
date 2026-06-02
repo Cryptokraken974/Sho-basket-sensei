@@ -35,6 +35,27 @@ Then open <http://localhost:8000/>. The data directory (SQLite database and
 stored video assets) defaults to `./data` and `DATABASE_URL` overrides the
 database location.
 
+### UI
+
+The web UI is server-rendered with Jinja2 and progressively enhanced with
+htmx (form posts) and Alpine.js (client state). Pages:
+
+- **`/`** — list and create games.
+- **`/games/{id}`** — upload an MP4, watch background processing update live,
+  then play the 720p proxy with a CV overlay canvas (detection boxes, track
+  trails, ball path) and per-layer toggles. Paste a detection/tracking run id
+  to load its overlays and live job progress.
+- **`/games/{id}/calibrate`** — capture a frame, click court landmarks to map
+  pixels to court coordinates, and save a calibration.
+
+### HTTP API
+
+In addition to the pages, the app exposes JSON endpoints consumed by the UI
+and CV worker: game/video CRUD and proxy streaming, court calibration
+(`/api/landmarks`, `/api/videos/{id}/calibrations`, `/project`, `/overlay`),
+and CV jobs (`/api/videos/{id}/detections`, `/tracking`,
+`/api/runs/{run_id}/progress|detections|tracks`).
+
 ## CV processing pipeline
 
 `basketvision_coach.cv_pipeline` contains dependency-light contracts for the planned video worker:

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}{{ game.name }} · BasketVision Coach{% endblock %}
+{% block content %}
+<div x-data="bvGamePage({ gameId: {{ game.id }}, videoId: {{ video.id if video else 'null' }} })"
+     x-init="init()">
+
+  <section class="panel">
+    <h1>{{ game.name }}</h1>
+    <p>
+      State:
+      <span class="badge" :class="'badge--' + (video ? video.state : 'none')"
+            x-text="video ? video.state : 'no upload'">{{ video.state if video else 'no upload' }}</span>
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Upload video</h2>
+    <p class="muted">MP4 only. Processing runs in the background; this page updates automatically.</p>
+    <form @submit.prevent="upload($event)" class="upload-form">
+      <input type="file" name="file" accept="video/mp4" required />
+      <button type="submit" :disabled="uploading" x-text="uploading ? 'Uploading…' : 'Upload'"></button>
+    </form>
+    <p class="error" x-show="error" x-text="error"></p>
+  </section>
+
+  <template x-if="video && video.state === 'failed'">
+    <section class="panel error-panel">
+      <h2>Transcode failed</h2>
+      <p x-text="video.error_message || 'Unknown error'"></p>
+    </section>
+  </template>
+
+  <template x-if="video && (video.state === 'uploaded' || video.state === 'processing')">
+    <section class="panel">
+      <h2>Processing…</h2>
+      <div class="spinner"></div>
+      <p class="muted">Generating a 720p playback proxy. This updates automatically.</p>
+    </section>
+  </template>
+
+  <template x-if="video && video.state === 'ready'">
+    <section class="panel">
+      <h2>Playback &amp; overlays</h2>
+      <div class="player-wrap">
+        <video x-ref="video" :src="proxyUrl" controls playsinline
+               @loadedmetadata="onVideoReady()"></video>
+        <canvas x-ref="overlay" class="overlay-canvas"></canvas>
+      </div>
+
+      <div class="overlay-controls">
+        <label><input type="checkbox" x-model="overlays.detection_boxes" /> Detection boxes</label>
+        <label><input type="checkbox" x-model="overlays.track_trails" /> Track trails</label>
+        <label><input type="checkbox" x-model="overlays.ball_path" /> Ball path</label>
+        <span class="muted" x-show="!activeRunId">No detection run loaded — overlays are empty.</span>
+      </div>
+
+      <dl class="meta">
+        <dt>Duration</dt><dd x-text="fmt(video.duration_s) + ' s'"></dd>
+        <dt>FPS</dt><dd x-text="fmt(video.fps)"></dd>
+        <dt>Dimensions</dt><dd x-text="(video.width || '?') + '×' + (video.height || '?')"></dd>
+        <dt>Timestamp mapping</dt><dd>ts_s = frame_idx / fps</dd>
+      </dl>
+
+      <p><a class="button-link" :href="'/games/{{ game.id }}/calibrate'">Open court calibration →</a></p>
+    </section>
+  </template>
+
+  <template x-if="video && video.state === 'ready'">
+    <section class="panel">
+      <h2>Processing jobs</h2>
+      <p class="muted">
+        Detection/tracking runs are produced by the CV worker. Paste a run id to load its
+        overlays and live progress.
+      </p>
+      <form class="inline-form" @submit.prevent="loadRun($event)">
+        <input type="text" x-model="runIdInput" placeholder="detection run id" />
+        <button type="submit">Load run</button>
+      </form>
+      <template x-if="progress">
+        <ul class="progress">
+          <li>Stage: <strong x-text="progress.stage"></strong></li>
+          <li>Status: <strong x-text="progress.status"></strong></li>
+          <li>Frames: <span x-text="(progress.frame_start ?? '–') + '–' + (progress.frame_end ?? '–')"></span></li>
+          <li>Processing FPS: <span x-text="fmt(progress.processing_fps)"></span></li>
+          <template x-for="w in progress.warnings" :key="w">
+            <li class="warn" x-text="'⚠ ' + w"></li>
+          </template>
+        </ul>
+      </template>
+    </section>
+  </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/app.js"></script>
+{% endblock %}

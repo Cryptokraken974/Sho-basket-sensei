@@ -1,0 +1,10 @@
+<ul id="game-list" class="game-list">
+  {% for game in games %}
+  <li>
+    <a href="/games/{{ game.id }}">{{ game.name }}</a>
+    <span class="muted">#{{ game.id }}</span>
+  </li>
+  {% else %}
+  <li class="muted">No games yet. Create one above.</li>
+  {% endfor %}
+</ul>
