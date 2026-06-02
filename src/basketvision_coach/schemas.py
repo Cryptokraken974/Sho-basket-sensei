@@ -170,6 +170,17 @@ class AnalysisRead(BaseModel):
     engine: str
 
 
+class ClickPromptIn(BaseModel):
+    object_label: str
+    frame_idx: int
+    x: float
+    y: float
+
+
+class ClickTrackRequest(BaseModel):
+    prompts: list[ClickPromptIn] = Field(min_length=1)
+
+
 class BoundingBoxRead(BaseModel):
     x: float
     y: float

@@ -69,6 +69,20 @@ can still use **Run demo (synthetic)**. The analyzer is dependency-injected
 (`create_app(analyzer=...)`), so it is covered in tests with a fake and swappable
 for other engines.
 
+**Click-to-track (SAM 2).** On the game page you can also type a label, enable
+click mode, and click an object in the video to follow it through the whole clip
+— SAM 2 propagates the selection across every frame, no training required. This
+needs the SAM 2 runtime:
+
+```bash
+pip install sam2 torch opencv-python-headless   # plus a SAM 2 checkpoint
+```
+
+Like the YOLO analyzer it is lazy-imported and dependency-injected
+(`create_app(click_tracker=...)`); without it the endpoint returns an actionable
+503. Tracked objects feed the same overlay and identity-review tools, so you can
+assign each tracked object to a roster player/team and correct any ID swaps.
+
 ### HTTP API
 
 In addition to the pages, the app exposes JSON endpoints consumed by the UI

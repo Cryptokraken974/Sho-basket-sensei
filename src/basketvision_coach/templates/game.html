@@ -48,7 +48,9 @@
       <div class="player-wrap">
         <video x-ref="video" :src="playSrc" controls playsinline
                @loadedmetadata="onVideoReady()"></video>
-        <canvas x-ref="overlay" class="overlay-canvas"></canvas>
+        <canvas x-ref="overlay" class="overlay-canvas"
+                :class="{ 'overlay-canvas--active': clickMode }"
+                @click="onCanvasClick($event)"></canvas>
       </div>
 
       <div class="demo-bar">
@@ -79,6 +81,34 @@
         <a class="button-link" :href="'/games/{{ game.id }}/calibrate'">Open court calibration →</a>
         <a class="button-link" href="/games/{{ game.id }}/tracks">Review tracked players →</a>
       </p>
+    </section>
+  </template>
+
+  <template x-if="canPlay">
+    <section class="panel">
+      <h2>Click-to-track (SAM 2)</h2>
+      <p class="muted">
+        Type a label, turn on click mode, then click an object in the video to follow it
+        through the whole clip. No training needed; requires the SAM 2 runtime.
+      </p>
+      <div class="inline-form">
+        <input type="text" x-model="clickLabel" placeholder="label, e.g. Player 7" />
+        <button :class="{ secondary: !clickMode }" @click="clickMode = !clickMode"
+                x-text="clickMode ? 'Click mode: ON (click the video)' : 'Enable click mode'"></button>
+      </div>
+      <ul class="game-list">
+        <template x-for="(p, i) in clickPrompts" :key="i">
+          <li>
+            <strong x-text="p.object_label"></strong>
+            <span class="muted"
+                  x-text="'frame ' + p.frame_idx + ' · (' + fmt(p.x) + ', ' + fmt(p.y) + ')'"></span>
+            <button class="secondary" @click="clickPrompts.splice(i, 1)">✕</button>
+          </li>
+        </template>
+        <li x-show="clickPrompts.length === 0" class="muted">No clicks yet.</li>
+      </ul>
+      <button @click="runClickTrack()" :disabled="clickTracking || clickPrompts.length === 0"
+              x-text="clickTracking ? 'Tracking…' : 'Track clicked objects'"></button>
     </section>
   </template>
 

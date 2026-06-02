@@ -14,6 +14,12 @@ from basketvision_coach.analysis import (
     load_default_analyzer,
     run_analysis,
 )
+from basketvision_coach.click_track import (
+    ClickPrompt,
+    ClickTracker,
+    load_default_click_tracker,
+    run_click_tracking,
+)
 from basketvision_coach.court_calibration import (
     CalibrationPointPair,
     CourtCalibrationService,
@@ -44,6 +50,7 @@ from basketvision_coach.schemas import (
     AnalysisRead,
     CalibrationCreate,
     CalibrationRead,
+    ClickTrackRequest,
     DemoAnalysisRead,
     DetectionRecordRead,
     DetectionRunCreate,
@@ -140,6 +147,7 @@ def create_app(
     vision_store: InMemoryVisionStore | None = None,
     identity_service: IdentityReviewService | None = None,
     analyzer: VideoAnalyzer | None = None,
+    click_tracker: ClickTracker | None = None,
 ) -> FastAPI:
     if service is not None and video_service is not None:
         raise ValueError("pass either service or video_service, not both")
@@ -439,6 +447,50 @@ def create_app(
         result = run_analysis(
             store, video_id=video_id, video_path=Path(source), analyzer=chosen
         )
+        return AnalysisRead(
+            detection_run_id=result.detection_run_id,
+            tracking_run_id=result.tracking_run_id,
+            source_width=result.source_width,
+            source_height=result.source_height,
+            fps=result.fps,
+            frame_count=result.frame_count,
+            object_count=result.object_count,
+            engine=result.engine,
+        )
+
+    @app.post(
+        "/api/videos/{video_id}/click-track",
+        response_model=AnalysisRead,
+        status_code=201,
+    )
+    def run_click_track(video_id: int, payload: ClickTrackRequest) -> AnalysisRead:
+        """Track each clicked object across the whole video with SAM 2."""
+        video = video_service.get_video(video_id)
+        if video is None:
+            raise HTTPException(status_code=404, detail="Video not found")
+        source = video.proxy_path if video.proxy_path else video.original_path
+        if not source or not Path(source).exists():
+            raise HTTPException(status_code=409, detail="No playable video file to analyze")
+        try:
+            tracker = click_tracker or load_default_click_tracker()
+        except AnalyzerUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        prompts = [
+            ClickPrompt(
+                object_label=p.object_label, frame_idx=p.frame_idx, x=p.x, y=p.y
+            )
+            for p in payload.prompts
+        ]
+        try:
+            result = run_click_tracking(
+                store,
+                video_id=video_id,
+                video_path=Path(source),
+                prompts=prompts,
+                tracker=tracker,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return AnalysisRead(
             detection_run_id=result.detection_run_id,
             tracking_run_id=result.tracking_run_id,

@@ -49,6 +49,10 @@ window.bvGamePage = function (config) {
     demoRunning: false,
     analyzing: false,
     engineNote: "YOLO+ByteTrack detects players & ball (needs the CV runtime). Demo uses synthetic data.",
+    clickMode: false,
+    clickLabel: "Player 1",
+    clickPrompts: [],
+    clickTracking: false,
 
     fmt: fmtNumber,
 
@@ -238,6 +242,52 @@ window.bvGamePage = function (config) {
         this.error = String(e.message || e);
       } finally {
         this.analyzing = false;
+      }
+    },
+
+    onCanvasClick(event) {
+      if (!this.clickMode) return;
+      const video = this.$refs.video;
+      const canvas = this.$refs.overlay;
+      if (!video || !canvas || !video.videoWidth) return;
+      const rect = canvas.getBoundingClientRect();
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = (event.clientY - rect.top) / rect.height;
+      // Clicks are stored in the played file's native pixel space, which is the
+      // same space SAM 2 will track in (it runs on that file).
+      this.clickPrompts.push({
+        object_label: this.clickLabel || `object ${this.clickPrompts.length + 1}`,
+        frame_idx: this.currentFrame(),
+        x: nx * video.videoWidth,
+        y: ny * video.videoHeight,
+      });
+    },
+
+    async runClickTrack() {
+      if (this.clickPrompts.length === 0) return;
+      this.clickTracking = true;
+      this.error = "";
+      try {
+        const res = await fetch(`/api/videos/${this.videoId}/click-track`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompts: this.clickPrompts }),
+        });
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.detail || `Click-track failed (${res.status})`);
+        }
+        const body = await res.json();
+        this.sourceW = body.source_width;
+        this.sourceH = body.source_height;
+        this.overlayFps = body.fps;
+        this.engineNote = `${body.engine}: tracked ${body.object_count} boxes across ${body.frame_count} frames`;
+        await this.loadRunPair(body.detection_run_id, body.tracking_run_id);
+        this.clickMode = false;
+      } catch (e) {
+        this.error = String(e.message || e);
+      } finally {
+        this.clickTracking = false;
       }
     },
 
