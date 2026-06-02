@@ -52,6 +52,23 @@ htmx (form posts) and Alpine.js (client state). Pages:
 - **`/games/{id}/calibrate`** — capture a frame, click court landmarks to map
   pixels to court coordinates, and save a calibration.
 
+### Real detection + tracking (optional CV runtime)
+
+The **Run analysis (YOLO)** button runs stock YOLO detection + ByteTrack
+tracking over the uploaded video and draws the resulting boxes/trails/ball path
+— **no model training required** (pretrained COCO weights already detect
+`person` and `sports ball`). The heavy runtime is not a declared dependency, so
+install it where you have a GPU/MPS and network access:
+
+```bash
+pip install ultralytics opencv-python-headless
+```
+
+Without it, the button returns a clear "install the CV runtime" message and you
+can still use **Run demo (synthetic)**. The analyzer is dependency-injected
+(`create_app(analyzer=...)`), so it is covered in tests with a fake and swappable
+for other engines.
+
 ### HTTP API
 
 In addition to the pages, the app exposes JSON endpoints consumed by the UI

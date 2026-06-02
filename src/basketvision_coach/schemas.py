@@ -159,6 +159,17 @@ class DemoAnalysisRead(BaseModel):
     frame_count: int
 
 
+class AnalysisRead(BaseModel):
+    detection_run_id: str
+    tracking_run_id: str
+    source_width: float
+    source_height: float
+    fps: float
+    frame_count: int
+    object_count: int
+    engine: str
+
+
 class BoundingBoxRead(BaseModel):
     x: float
     y: float

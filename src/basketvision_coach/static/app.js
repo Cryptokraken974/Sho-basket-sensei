@@ -47,6 +47,8 @@ window.bvGamePage = function (config) {
     sourceH: 0,
     overlayFps: 30,
     demoRunning: false,
+    analyzing: false,
+    engineNote: "YOLO+ByteTrack detects players & ball (needs the CV runtime). Demo uses synthetic data.",
 
     fmt: fmtNumber,
 
@@ -205,6 +207,40 @@ window.bvGamePage = function (config) {
       }
     },
 
+    async loadRunPair(detectionRunId, trackingRunId) {
+      const [pRes, dRes, tRes] = await Promise.all([
+        fetch(`/api/runs/${detectionRunId}/progress`),
+        fetch(`/api/runs/${detectionRunId}/detections`),
+        fetch(`/api/runs/${trackingRunId}/tracks`),
+      ]);
+      this.activeRunId = detectionRunId;
+      this.progress = pRes.ok ? await pRes.json() : null;
+      this.detections = dRes.ok ? await dRes.json() : [];
+      this.tracks = tRes.ok ? await tRes.json() : [];
+    },
+
+    async runAnalysis() {
+      this.analyzing = true;
+      this.error = "";
+      try {
+        const res = await fetch(`/api/videos/${this.videoId}/analysis`, { method: "POST" });
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.detail || `Analysis failed (${res.status})`);
+        }
+        const body = await res.json();
+        this.sourceW = body.source_width;
+        this.sourceH = body.source_height;
+        this.overlayFps = body.fps;
+        this.engineNote = `${body.engine}: ${body.object_count} detections across ${body.frame_count} frames`;
+        await this.loadRunPair(body.detection_run_id, body.tracking_run_id);
+      } catch (e) {
+        this.error = String(e.message || e);
+      } finally {
+        this.analyzing = false;
+      }
+    },
+
     async runDemo() {
       this.demoRunning = true;
       this.error = "";
@@ -226,15 +262,7 @@ window.bvGamePage = function (config) {
         this.sourceW = body.source_width;
         this.sourceH = body.source_height;
         this.overlayFps = body.fps;
-        this.activeRunId = body.detection_run_id;
-        const [pRes, dRes, tRes] = await Promise.all([
-          fetch(`/api/runs/${body.detection_run_id}/progress`),
-          fetch(`/api/runs/${body.detection_run_id}/detections`),
-          fetch(`/api/runs/${body.tracking_run_id}/tracks`),
-        ]);
-        this.progress = pRes.ok ? await pRes.json() : null;
-        this.detections = dRes.ok ? await dRes.json() : [];
-        this.tracks = tRes.ok ? await tRes.json() : [];
+        await this.loadRunPair(body.detection_run_id, body.tracking_run_id);
       } catch (e) {
         this.error = String(e.message || e);
       } finally {

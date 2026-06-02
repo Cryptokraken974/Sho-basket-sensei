@@ -52,12 +52,11 @@
       </div>
 
       <div class="demo-bar">
-        <button @click="runDemo()" :disabled="demoRunning"
-                x-text="demoRunning ? 'Analyzing…' : '▶ Run demo analysis'"></button>
-        <span class="muted">
-          Synthetic detections that exercise the real tracking + overlay pipeline
-          (no trained detector yet).
-        </span>
+        <button @click="runAnalysis()" :disabled="analyzing"
+                x-text="analyzing ? 'Analyzing…' : '▶ Run analysis (YOLO)'"></button>
+        <button class="secondary" @click="runDemo()" :disabled="demoRunning"
+                x-text="demoRunning ? 'Analyzing…' : 'Run demo (synthetic)'"></button>
+        <span class="muted" x-text="engineNote"></span>
       </div>
 
       <div class="overlay-controls">

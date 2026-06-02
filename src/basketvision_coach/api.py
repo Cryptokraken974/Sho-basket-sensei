@@ -8,6 +8,12 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from basketvision_coach.analysis import (
+    AnalyzerUnavailable,
+    VideoAnalyzer,
+    load_default_analyzer,
+    run_analysis,
+)
 from basketvision_coach.court_calibration import (
     CalibrationPointPair,
     CourtCalibrationService,
@@ -35,6 +41,7 @@ from basketvision_coach.identity import (
     TrackIdentity,
 )
 from basketvision_coach.schemas import (
+    AnalysisRead,
     CalibrationCreate,
     CalibrationRead,
     DemoAnalysisRead,
@@ -132,6 +139,7 @@ def create_app(
     calibration_service: CourtCalibrationService | None = None,
     vision_store: InMemoryVisionStore | None = None,
     identity_service: IdentityReviewService | None = None,
+    analyzer: VideoAnalyzer | None = None,
 ) -> FastAPI:
     if service is not None and video_service is not None:
         raise ValueError("pass either service or video_service, not both")
@@ -408,6 +416,38 @@ def create_app(
             source_height=DEMO_HEIGHT,
             fps=clip_fps,
             frame_count=len(frames),
+        )
+
+    @app.post(
+        "/api/videos/{video_id}/analysis",
+        response_model=AnalysisRead,
+        status_code=201,
+    )
+    def run_real_analysis(video_id: int) -> AnalysisRead:
+        """Run YOLO detection + ByteTrack tracking over the stored video file."""
+        video = video_service.get_video(video_id)
+        if video is None:
+            raise HTTPException(status_code=404, detail="Video not found")
+        # Analyze the same file the UI plays so overlay coordinates align.
+        source = video.proxy_path if video.proxy_path else video.original_path
+        if not source or not Path(source).exists():
+            raise HTTPException(status_code=409, detail="No playable video file to analyze")
+        try:
+            chosen = analyzer or load_default_analyzer()
+        except AnalyzerUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        result = run_analysis(
+            store, video_id=video_id, video_path=Path(source), analyzer=chosen
+        )
+        return AnalysisRead(
+            detection_run_id=result.detection_run_id,
+            tracking_run_id=result.tracking_run_id,
+            source_width=result.source_width,
+            source_height=result.source_height,
+            fps=result.fps,
+            frame_count=result.frame_count,
+            object_count=result.object_count,
+            engine=result.engine,
         )
 
     @app.get("/api/runs/{run_id}/progress", response_model=JobProgressRead)

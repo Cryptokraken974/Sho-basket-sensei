@@ -43,6 +43,11 @@ python_version = "3.11"
 strict = true
 mypy_path = "src"
 
+# Optional CV runtime (installed separately; not a declared dependency).
+[[tool.mypy.overrides]]
+module = ["ultralytics.*", "cv2.*"]
+ignore_missing_imports = true
+
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]

@@ -64,6 +64,7 @@ button, .button-link {
 }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 button:hover:not(:disabled) { filter: brightness(1.08); }
+button.secondary { background: var(--border); color: var(--text); }
 
 input[type="text"], input[type="number"], select, input[type="file"] {
   background: #0f1115;
