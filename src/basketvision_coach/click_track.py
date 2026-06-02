@@ -10,6 +10,7 @@ runs where ``sam2``/``torch`` are installed.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +22,7 @@ from basketvision_coach.analysis import (
     DetectedObject,
     FrameDetections,
     VideoMeta,
+    resolve_device,
 )
 from basketvision_coach.cv_pipeline import (
     BoundingBox,
@@ -181,14 +183,19 @@ class Sam2ClickTracker:
 
     checkpoint: str = "sam2_hiera_small.pt"
     model_cfg: str = "sam2_hiera_s.yaml"
+    device: str | None = None
     engine: str = "sam2"
 
     def _build_predictor(self) -> Any:  # pragma: no cover - needs sam2/torch
+        device = resolve_device(self.device)
+        # Several SAM 2 ops lack Metal kernels; let them fall back to CPU on MPS.
+        if device == "mps":
+            os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
         try:
             from sam2.build_sam import build_sam2_video_predictor
         except ImportError as exc:
             raise AnalyzerUnavailable(SAM_INSTALL_HINT) from exc
-        return build_sam2_video_predictor(self.model_cfg, self.checkpoint)
+        return build_sam2_video_predictor(self.model_cfg, self.checkpoint, device=device)
 
     def probe(self, video_path: Path) -> VideoMeta:  # pragma: no cover - needs opencv
         try:

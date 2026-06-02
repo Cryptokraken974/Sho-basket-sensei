@@ -45,7 +45,7 @@ mypy_path = "src"
 
 # Optional CV runtime (installed separately; not a declared dependency).
 [[tool.mypy.overrides]]
-module = ["ultralytics.*", "cv2.*", "sam2.*"]
+module = ["ultralytics.*", "cv2.*", "sam2.*", "torch", "torch.*"]
 ignore_missing_imports = true
 
 [tool.ruff]

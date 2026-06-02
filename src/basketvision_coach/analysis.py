@@ -14,6 +14,7 @@ analyzer in tests and CI without the models installed.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -39,6 +40,29 @@ CV_INSTALL_HINT = (
 
 class AnalyzerUnavailable(RuntimeError):
     """Raised when the optional CV runtime is not installed."""
+
+
+def resolve_device(explicit: str | None = None) -> str:
+    """Pick the torch device: explicit arg, then ``DEVICE`` env, then auto-detect.
+
+    Auto-detection prefers CUDA, then Apple Silicon's MPS (Metal), then CPU, so
+    it runs on an M-series Mac out of the box. Falls back to ``cpu`` when torch
+    is not installed (the CV runtime is optional).
+    """
+
+    requested = explicit if explicit is not None else os.environ.get("DEVICE")
+    if requested:
+        return requested.strip().lower()
+    try:
+        import torch
+    except ImportError:
+        return "cpu"
+    if torch.cuda.is_available():  # pragma: no cover - needs a CUDA gpu
+        return "cuda"
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_available():  # pragma: no cover - needs Apple gpu
+        return "mps"
+    return "cpu"  # pragma: no cover - needs torch installed
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +196,7 @@ class YoloByteTrackAnalyzer:
 
     model_name: str = "yolov8n.pt"
     confidence: float = 0.25
+    device: str | None = None
     engine: str = field(default="yolov8+bytetrack")
     _fps: float = field(default=25.0, init=False, repr=False)
 
@@ -208,6 +233,7 @@ class YoloByteTrackAnalyzer:
             classes=list(COCO_TO_CLASS),
             conf=self.confidence,
             tracker="bytetrack.yaml",
+            device=resolve_device(self.device),
             verbose=False,
         )
         for frame_idx, result in enumerate(results):

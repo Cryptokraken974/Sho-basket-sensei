@@ -40,6 +40,7 @@ binds `127.0.0.1:8000` by default.
 |---|---|---|
 | `DATA_ROOT` | `data` | Directory for the SQLite db and stored/transcoded video assets. |
 | `DATABASE_URL` | `sqlite:///<DATA_ROOT>/basketvision.db` | Override the database (e.g. Postgres). |
+| `DEVICE` | auto (`cuda`→`mps`→`cpu`) | torch device for the YOLO/SAM 2 runtimes. |
 
 ### Changing host / port
 
@@ -127,6 +128,19 @@ Like the YOLO analyzer it is lazy-imported and dependency-injected
 (`create_app(click_tracker=...)`); without it the endpoint returns an actionable
 503. Tracked objects feed the same overlay and identity-review tools, so you can
 assign each tracked object to a roster player/team and correct any ID swaps.
+
+**Running on a Mac (Apple Silicon / MPS).** Both runtimes pick the torch device
+automatically — CUDA, then Apple's MPS (Metal), then CPU — or set `DEVICE`
+explicitly. Run natively (not in Docker; macOS containers can't reach the Apple
+GPU):
+
+```bash
+DEVICE=mps uv run uvicorn basketvision_coach.api:app
+```
+
+On MPS, `PYTORCH_ENABLE_MPS_FALLBACK=1` is set automatically for SAM 2 so ops
+without Metal kernels fall back to CPU. SAM 2 is memory-heavy — prefer short
+clips on smaller machines.
 
 ### HTTP API
 
