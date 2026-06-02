@@ -52,6 +52,13 @@ Heavy deps are NOT in `uv.lock` (kept light) and Docker on macOS can't use the
 Apple GPU, so install them natively into the project venv to enable the
 **Run analysis (YOLO)** and **Click-to-track (SAM 2)** buttons.
 
+> ⚠️ **`uv sync` DELETES the CV libs.** `uv sync` is exact — it removes anything
+> not in `uv.lock` (which excludes ultralytics/torch/sam2 on purpose). So
+> `git pull && uv sync --extra dev` strips the CV runtime. **Reinstall the CV
+> deps after any `uv sync`,** and run the CV server with the venv python directly
+> (below) so nothing re-syncs underneath it. If "Run analysis" reports the CV
+> runtime is missing despite installing it, a `uv sync` removed it — reinstall.
+
 GOTCHA: plain `uv pip install` can target a different venv when `VIRTUAL_ENV` is
 set in the shell. Always target the project venv explicitly:
 
@@ -81,20 +88,24 @@ opencv 4.13, sam-2 1.0, with checkpoint `models/sam2.1_hiera_small.pt` and confi
 
 ```bash
 DEVICE=mps SAM2_CHECKPOINT=models/sam2.1_hiera_small.pt \
-  uv run python -m basketvision_coach.checkcv
+  .venv/bin/python -m basketvision_coach.checkcv
 ```
 
 Aim for: device `mps`, torch/ultralytics/opencv/sam2 ✓, checkpoint found, and
-both features `READY`. Each ✗ prints the exact `uv pip install` to run.
+both features `READY`. Each ✗ prints the exact `uv pip install` to run. (Use the
+venv python, not `uv run`, so the check can't trigger a re-sync.)
 
 ### Run with CV enabled (Apple Silicon / MPS)
+
+Use the venv python directly (NOT `uv run`, which re-syncs and can strip the CV
+libs):
 
 ```bash
 DEVICE=mps \
 SAM2_CHECKPOINT=models/sam2.1_hiera_small.pt \
 SAM2_CONFIG=configs/sam2.1/sam2.1_hiera_s.yaml \
 YOLO_MODEL=yolov8n.pt \
-uv run uvicorn basketvision_coach.api:app --host 0.0.0.0 --port 8000
+.venv/bin/python -m uvicorn basketvision_coach.api:app --host 0.0.0.0 --port 8000
 ```
 
 `PYTORCH_ENABLE_MPS_FALLBACK=1` is set automatically on MPS. SAM 2 holds all
@@ -161,7 +172,7 @@ CI (`.github/workflows/ci.yml`) runs all three in a clean env on every PR.
 |---|---|
 | `ModuleNotFoundError` on import | `uv sync --extra dev`. |
 | Transcode failed / exit non-zero | Read the surfaced ffmpeg stderr; ensure `ffmpeg` is installed; click **Retry transcode**. Original playback still works. |
-| CV deps "not installed" but you installed them | You hit a different venv — reinstall with `uv pip install --python .venv/bin/python ...`. |
+| CV deps "not installed" but you installed them | A `uv sync` removed them (exact sync, not in lock) OR you hit a different venv. Reinstall with `uv pip install --python .venv/bin/python ...` and run via `.venv/bin/python -m uvicorn`. |
 | YOLO/SAM 2 button → 503 | Install the CV runtime; run the preflight. |
 | SAM 2 config/checkpoint error on first click | Match `SAM2_CONFIG` to the installed package version (e.g. `configs/sam2.1/sam2.1_hiera_s.yaml`) and `SAM2_CHECKPOINT` to the downloaded file. |
 | SAM 2 slow / OOM on Mac | Use `DEVICE=mps` and short clips. |

@@ -33,8 +33,10 @@ COCO_SPORTS_BALL = 32
 COCO_TO_CLASS = {COCO_PERSON: "player", COCO_SPORTS_BALL: "ball"}
 
 CV_INSTALL_HINT = (
-    "Real analysis needs the CV runtime. Install it with "
-    "`pip install ultralytics opencv-python-headless` (GPU/MPS recommended)."
+    "Real analysis needs the CV runtime. Install it into the project venv with "
+    "`uv pip install --python .venv/bin/python ultralytics opencv-python-headless torch`, "
+    "then verify with `uv run python -m basketvision_coach.checkcv`. "
+    "Note: `uv sync` removes these (they are not in uv.lock), so reinstall after any sync."
 )
 
 
