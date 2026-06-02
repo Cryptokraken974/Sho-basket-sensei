@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Track review · {{ game.name }}{% endblock %}
+{% block content %}
+<div x-data="bvTracks({ duration: {{ duration }} })">
+  <section class="panel">
+    <h1>{{ game.name }} — tracked player review</h1>
+    <p class="muted">
+      Click a track, optionally bound the segment by seconds, then assign a roster player and team.
+    </p>
+    <p><a href="/games/{{ game.id }}">← Back to {{ game.name }}</a></p>
+  </section>
+
+  <section class="panel">
+    <h2>Tracks</h2>
+    <div class="track-buttons">
+      {% for tid in track_ids %}
+      <button type="button" class="track-btn" data-track-id="track-{{ tid }}"
+              :class="{ 'track-btn--active': trackId === 'track-{{ tid }}' }"
+              @click="trackId = 'track-{{ tid }}'">Track {{ tid }}</button>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Assign selected track segment</h2>
+    <form class="identity-form" @submit.prevent="save()">
+      <label>Track ID <input type="text" x-model="trackId" required /></label>
+      <label>Start seconds
+        <input type="number" step="0.01" min="0" max="{{ duration }}" x-model.number="startS" />
+      </label>
+      <label>End seconds
+        <input type="number" step="0.01" min="0" max="{{ duration }}" x-model.number="endS" />
+      </label>
+      <label>Player
+        <select x-model="playerId">
+          <option value="">Unassigned player</option>
+          {% for player in players %}
+          <option value="{{ player.id }}">{{ player.name }} ({{ player.team_id }})</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Team
+        <select x-model="teamId" required>
+          {% for team in teams %}
+          <option value="{{ team.id }}">{{ team.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Reviewer <input type="text" x-model="user" required /></label>
+      <button type="submit" :disabled="saving" x-text="saving ? 'Saving…' : 'Save assignment'"></button>
+    </form>
+    <p class="error" x-show="error" x-text="error"></p>
+  </section>
+
+  <section class="panel">
+    <h2>Reviewed identities</h2>
+    <table class="points">
+      <thead>
+        <tr><th>Track</th><th>Player</th><th>Team</th><th>Start</th><th>End</th><th>Source</th></tr>
+      </thead>
+      <tbody>
+        {% for a in assignments %}
+        <tr>
+          <td>{{ a.track_id }}</td>
+          <td>{{ a.player_id or 'unassigned' }}</td>
+          <td>{{ a.team_id or 'unknown' }}</td>
+          <td>{{ a.start_s if a.start_s is not none else 'full' }}</td>
+          <td>{{ a.end_s if a.end_s is not none else 'track' }}</td>
+          <td>{{ a.source }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">No reviewed identities yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.bvTracks = function (config) {
+    return {
+      duration: config.duration,
+      trackId: "track-1",
+      startS: null,
+      endS: null,
+      playerId: "",
+      teamId: "",
+      user: "reviewer",
+      saving: false,
+      error: "",
+      async save() {
+        this.saving = true;
+        this.error = "";
+        try {
+          const res = await fetch("/api/track-identities", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              track_id: this.trackId,
+              player_id: this.playerId === "" ? null : this.playerId,
+              team_id: this.teamId === "" ? null : this.teamId,
+              user: this.user,
+              start_s: this.startS === "" ? null : this.startS,
+              end_s: this.endS === "" ? null : this.endS,
+              confidence: 1.0,
+              source: "manual",
+            }),
+          });
+          if (!res.ok) {
+            const detail = await res.json().catch(() => ({}));
+            throw new Error(detail.detail || `Save failed (${res.status})`);
+          }
+          window.location.reload();
+        } catch (e) {
+          this.error = String(e.message || e);
+        } finally {
+          this.saving = false;
+        }
+      },
+    };
+  };
+</script>
+{% endblock %}

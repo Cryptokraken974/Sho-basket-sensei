@@ -27,6 +27,12 @@ from basketvision_coach.cv_pipeline import (
     VisionPipeline,
 )
 from basketvision_coach.db import build_session_factory
+from basketvision_coach.identity import (
+    IdentityReviewService,
+    RosterPlayer,
+    RosterTeam,
+    TrackIdentity,
+)
 from basketvision_coach.schemas import (
     CalibrationCreate,
     CalibrationRead,
@@ -36,9 +42,15 @@ from basketvision_coach.schemas import (
     GameRead,
     JobProgressRead,
     OverlayRequest,
+    PlayerCreate,
+    PlayerRead,
     ProjectedRead,
     ProjectRequest,
     RunRead,
+    TeamCreate,
+    TeamRead,
+    TrackIdentityAssign,
+    TrackIdentityRead,
     TrackingRunCreate,
     TrackRecordRead,
     VideoRead,
@@ -82,15 +94,49 @@ def _progress_to_read(progress: object) -> JobProgressRead:
     return JobProgressRead.model_validate(progress, from_attributes=True)
 
 
+def team_to_read(team: RosterTeam) -> TeamRead:
+    return TeamRead(id=team.id, name=team.name, jersey_color=team.jersey_color)
+
+
+def player_to_read(player: RosterPlayer) -> PlayerRead:
+    return PlayerRead(
+        id=player.id,
+        name=player.name,
+        team_id=player.team_id,
+        jersey_number=player.jersey_number,
+    )
+
+
+def identity_to_read(identity: TrackIdentity) -> TrackIdentityRead:
+    return TrackIdentityRead(
+        id=identity.id,
+        track_id=identity.track_id,
+        player_id=identity.player_id,
+        team_id=identity.team_id,
+        confidence=identity.confidence,
+        start_s=identity.start_s,
+        end_s=identity.end_s,
+        source=identity.source,
+        reviewed=identity.reviewed,
+    )
+
+
 def create_app(
     service: VideoIngestService | None = None,
     *,
+    video_service: VideoIngestService | None = None,
     calibration_service: CourtCalibrationService | None = None,
     vision_store: InMemoryVisionStore | None = None,
+    identity_service: IdentityReviewService | None = None,
 ) -> FastAPI:
-    video_service = service or default_service()
+    if service is not None and video_service is not None:
+        raise ValueError("pass either service or video_service, not both")
+    video_service = service or video_service or default_service()
     calibration = calibration_service or CourtCalibrationService()
     store = vision_store or InMemoryVisionStore()
+    identity = identity_service or IdentityReviewService(
+        session_factory=video_service.session_factory
+    )
     app = FastAPI(title="BasketVision Coach")
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
@@ -330,12 +376,93 @@ def create_app(
             for record in store.list_tracks(run_id)
         ]
 
+    # --- Identity review (roster / track identities) --------------------------
+
+    @app.post("/api/roster/teams", response_model=TeamRead, status_code=201)
+    def create_team(payload: TeamCreate) -> TeamRead:
+        try:
+            team = identity.create_team(
+                payload.name, team_id=payload.id, jersey_color=payload.jersey_color
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return team_to_read(team)
+
+    @app.get("/api/roster/teams", response_model=list[TeamRead])
+    def list_teams() -> list[TeamRead]:
+        return [team_to_read(team) for team in identity.list_teams()]
+
+    @app.post("/api/roster/players", response_model=PlayerRead, status_code=201)
+    def create_player(payload: PlayerCreate) -> PlayerRead:
+        try:
+            player = identity.create_player(
+                payload.name,
+                payload.team_id,
+                player_id=payload.id,
+                jersey_number=payload.jersey_number,
+            )
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return player_to_read(player)
+
+    @app.get("/api/roster/players", response_model=list[PlayerRead])
+    def list_players(team_id: str | None = None) -> list[PlayerRead]:
+        return [player_to_read(p) for p in identity.list_players(team_id=team_id)]
+
+    @app.post("/api/track-identities", response_model=TrackIdentityRead, status_code=201)
+    def assign_track_identity(payload: TrackIdentityAssign) -> TrackIdentityRead:
+        try:
+            assigned = identity.assign_track_segment(
+                track_id=payload.track_id,
+                player_id=payload.player_id,
+                team_id=payload.team_id,
+                user=payload.user,
+                start_s=payload.start_s,
+                end_s=payload.end_s,
+                confidence=payload.confidence,
+                source=payload.source,  # type: ignore[arg-type]
+            )
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return identity_to_read(assigned)
+
+    @app.get("/api/track-identities", response_model=list[TrackIdentityRead])
+    def list_track_identities(track_id: str | None = None) -> list[TrackIdentityRead]:
+        return [
+            identity_to_read(item)
+            for item in identity.list_track_identities(track_id=track_id)
+        ]
+
     # --- HTML pages (Jinja2 + htmx + Alpine) ----------------------------------
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:
         games = video_service.list_games()
         return _TEMPLATES.TemplateResponse(request, "index.html", {"games": games})
+
+    @app.get("/games/{game_id}/tracks", response_class=HTMLResponse)
+    def tracks_page(request: Request, game_id: int) -> HTMLResponse:
+        game = video_service.get_game(game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        video = video_service.latest_video_for_game(game_id)
+        duration = video.duration_s if video and video.duration_s else 20.0
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "tracks.html",
+            {
+                "game": game,
+                "duration": duration,
+                "teams": identity.list_teams(),
+                "players": identity.list_players(),
+                "assignments": identity.list_track_identities(),
+                "track_ids": list(range(1, 6)),
+            },
+        )
 
     @app.post("/games", response_class=HTMLResponse)
     def create_game_form(request: Request, name: Annotated[str, Form()]) -> HTMLResponse:

@@ -61,7 +61,10 @@
         <dt>Timestamp mapping</dt><dd>ts_s = frame_idx / fps</dd>
       </dl>
 
-      <p><a class="button-link" :href="'/games/{{ game.id }}/calibrate'">Open court calibration →</a></p>
+      <p>
+        <a class="button-link" :href="'/games/{{ game.id }}/calibrate'">Open court calibration →</a>
+        <a class="button-link" href="/games/{{ game.id }}/tracks">Review tracked players →</a>
+      </p>
     </section>
   </template>
 

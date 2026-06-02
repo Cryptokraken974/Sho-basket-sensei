@@ -186,3 +186,55 @@ class TrackRecordRead(BaseModel):
     court_coordinates: CourtPointRead | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- Identity review (roster / track identities) -------------------------------
+
+
+class TeamCreate(BaseModel):
+    name: str
+    id: str | None = None
+    jersey_color: str | None = None
+
+
+class TeamRead(BaseModel):
+    id: str
+    name: str
+    jersey_color: str | None
+
+
+class PlayerCreate(BaseModel):
+    name: str
+    team_id: str
+    id: str | None = None
+    jersey_number: str | None = None
+
+
+class PlayerRead(BaseModel):
+    id: str
+    name: str
+    team_id: str
+    jersey_number: str | None
+
+
+class TrackIdentityAssign(BaseModel):
+    track_id: str
+    player_id: str | None = None
+    team_id: str | None = None
+    user: str
+    start_s: float | None = None
+    end_s: float | None = None
+    confidence: float = 1.0
+    source: str = "manual"
+
+
+class TrackIdentityRead(BaseModel):
+    id: int | None
+    track_id: str
+    player_id: str | None
+    team_id: str | None
+    confidence: float
+    start_s: float | None
+    end_s: float | None
+    source: str
+    reviewed: bool

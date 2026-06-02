@@ -130,6 +130,12 @@ input[type="text"], input[type="number"], select, input[type="file"] {
 .points th, .points td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); }
 .court-input { width: 5rem; }
 
+.track-buttons { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.track-btn { background: var(--border); color: var(--text); }
+.track-btn--active { background: var(--accent); color: #1a1d24; outline: 2px solid var(--ok); }
+.identity-form { display: flex; flex-direction: column; gap: 0.6rem; max-width: 28rem; }
+.identity-form label { display: flex; flex-direction: column; gap: 0.2rem; }
+
 .spinner {
   width: 28px; height: 28px;
   border: 3px solid var(--border);
