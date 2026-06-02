@@ -66,24 +66,6 @@ uv run uvicorn basketvision_coach.api:app --host 0.0.0.0 --port ${PORT:-8000}
 uv run uvicorn basketvision_coach.api:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-### Docker
-
-A `Dockerfile` (with ffmpeg) and `docker-compose.yml` (persistent `/data`
-volume) are included:
-
-```bash
-docker build -t sensei .
-docker run --rm -p 8000:8000 -v sensei-data:/data sensei
-
-# or, with compose (host port overridable):
-docker compose up --build
-SENSEI_PORT=9000 docker compose up        # serve on http://localhost:9000/
-```
-
-The container reads `PORT` (default 8000) and stores everything under the
-`/data` volume. The optional CV runtime (YOLO/SAM 2) is not baked into the
-image to keep it light — add it in a derived image if you need those buttons.
-
 ### UI
 
 The web UI is server-rendered with Jinja2 and progressively enhanced with
@@ -134,8 +116,7 @@ assign each tracked object to a roster player/team and correct any ID swaps.
 
 **Running on a Mac (Apple Silicon / MPS).** Both runtimes pick the torch device
 automatically — CUDA, then Apple's MPS (Metal), then CPU — or set `DEVICE`
-explicitly. Run natively (not in Docker; macOS containers can't reach the Apple
-GPU):
+explicitly:
 
 ```bash
 DEVICE=mps uv run uvicorn basketvision_coach.api:app

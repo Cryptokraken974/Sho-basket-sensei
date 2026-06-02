@@ -3,8 +3,8 @@ name: sensei
 description: >
   Deploy, run, configure, manage, and troubleshoot the BasketVision Coach
   (Sho-basket-sensei) FastAPI app. Use when asked to start/serve/run/build the
-  app, install or enable the CV runtime (YOLO/SAM 2) on a Mac, run via Docker,
-  change the port/host, set env vars (DATA_ROOT, DATABASE_URL, DEVICE, PORT,
+  app, install or enable the CV runtime (YOLO/SAM 2) on a Mac,
+  change the port/host, set env vars (DATA_ROOT, DATABASE_URL, DEVICE,
   YOLO_MODEL, SAM2_CHECKPOINT, SAM2_CONFIG, SAMPLES_DIR), run the
   test/lint/type gates, run the CV preflight, reset data, or debug startup,
   ffmpeg, GPU/MPS, transcode, or CV-runtime errors.
@@ -48,9 +48,9 @@ URL: http://localhost:8000/ (or chosen port). Bind `--host 0.0.0.0` for LAN acce
 
 ## CV runtime (YOLO + SAM 2) — optional, native only
 
-Heavy deps are NOT in `uv.lock` (kept light) and Docker on macOS can't use the
-Apple GPU, so install them natively into the project venv to enable the
-**Run analysis (YOLO)** and **Click-to-track (SAM 2)** buttons.
+Heavy deps are NOT in `uv.lock` (kept light), so install them natively into the
+project venv to enable the **Run analysis (YOLO)** and
+**Click-to-track (SAM 2)** buttons.
 
 > ⚠️ **`uv sync` DELETES the CV libs.** `uv sync` is exact — it removes anything
 > not in `uv.lock` (which excludes ultralytics/torch/sam2 on purpose). So
@@ -113,15 +113,6 @@ frames in memory — test on SHORT clips first. CV models load lazily on first
 request (not at startup), so config/checkpoint errors surface when a button is
 first clicked, not when the server boots.
 
-## Docker (core app; no CV/GPU on macOS)
-
-```bash
-docker compose up --build                 # http://localhost:8000/
-SENSEI_PORT=9000 docker compose up        # http://localhost:9000/
-```
-
-ffmpeg is baked in; data persists in the `sensei-data` volume (`/data`).
-
 ## Configuration (env vars)
 
 | Var | Default | Purpose |
@@ -133,8 +124,6 @@ ffmpeg is baked in; data persists in the `sensei-data` volume (`/data`).
 | `SAM2_CHECKPOINT` | `sam2_hiera_small.pt` | Path to the SAM 2 checkpoint. |
 | `SAM2_CONFIG` | `sam2_hiera_s.yaml` | SAM 2 config matching the checkpoint. |
 | `SAMPLES_DIR` | `samples` | Dir of bundled `.mp4` clips offered in the UI. |
-| `PORT` | `8000` | Honored by the Docker image's launch command. |
-| `SENSEI_PORT` | `8000` | Host port mapping in docker-compose. |
 
 ## Quality gates (keep green before committing)
 
@@ -176,7 +165,7 @@ CI (`.github/workflows/ci.yml`) runs all three in a clean env on every PR.
 | YOLO/SAM 2 button → 503 | Install the CV runtime; run the preflight. |
 | SAM 2 config/checkpoint error on first click | Match `SAM2_CONFIG` to the installed package version (e.g. `configs/sam2.1/sam2.1_hiera_s.yaml`) and `SAM2_CHECKPOINT` to the downloaded file. |
 | SAM 2 slow / OOM on Mac | Use `DEVICE=mps` and short clips. |
-| Port already in use | `--port <N>` (native) or `SENSEI_PORT=<N>` (compose). |
+| Port already in use | run with `--port <N>`. |
 
 ## Conventions
 
