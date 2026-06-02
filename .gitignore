@@ -18,3 +18,10 @@ dist/
 
 # Local data (SQLite db, stored/transcoded video assets)
 data/
+
+# CV model weights / checkpoints — downloaded artifacts, not source.
+# (The SAM 2 checkpoint is ~184MB; GitHub rejects files over 100MB.)
+models/
+*.pt
+*.pth
+*.onnx
