@@ -303,6 +303,14 @@ def create_app(
             raise HTTPException(status_code=404, detail="Original file is missing")
         return FileResponse(original, media_type="video/mp4", filename="original.mp4")
 
+    @app.post("/api/videos/{video_id}/retranscode", response_model=VideoRead)
+    def retranscode(video_id: int, background_tasks: BackgroundTasks) -> VideoRead:
+        video = video_service.get_video(video_id)
+        if video is None:
+            raise HTTPException(status_code=404, detail="Video not found")
+        background_tasks.add_task(video_service.transcode_video, video_id)
+        return video_to_read(video)
+
     # --- Court calibration ----------------------------------------------------
 
     @app.get("/api/landmarks", response_model=list[str])

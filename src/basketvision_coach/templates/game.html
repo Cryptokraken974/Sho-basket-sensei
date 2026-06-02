@@ -40,6 +40,8 @@
       <h2>Transcode failed</h2>
       <p x-text="video.error_message || 'Unknown error'"></p>
       <p class="muted">You can still play the uploaded original and run a demo analysis below.</p>
+      <button class="secondary" @click="retranscode()" :disabled="uploading"
+              x-text="uploading ? 'Retrying…' : 'Retry transcode'"></button>
     </section>
   </template>
 

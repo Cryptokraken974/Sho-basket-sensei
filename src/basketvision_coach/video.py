@@ -52,6 +52,24 @@ def parse_rational(value: str) -> float:
     return float(numerator) / denominator_float
 
 
+def _run_ffmpeg(command: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run an ffmpeg/ffprobe command, surfacing stderr on failure."""
+
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True)
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"{command[0]} not found; install ffmpeg to enable transcoding"
+        ) from exc
+    if completed.returncode != 0:
+        tail = "\n".join((completed.stderr or "").strip().splitlines()[-6:])
+        tool = command[0]
+        raise RuntimeError(
+            f"{tool} exited {completed.returncode}: {tail or 'no stderr output'}"
+        )
+    return completed
+
+
 def probe_metadata(source: Path) -> FfmpegMetadata:
     command = [
         "ffprobe",
@@ -65,7 +83,7 @@ def probe_metadata(source: Path) -> FfmpegMetadata:
         "json",
         str(source),
     ]
-    completed = subprocess.run(command, capture_output=True, check=True, text=True)
+    completed = _run_ffmpeg(command)
     payload = json.loads(completed.stdout)
     streams = payload.get("streams", [])
     if not streams:
@@ -82,55 +100,66 @@ def probe_metadata(source: Path) -> FfmpegMetadata:
     )
 
 
-def run_ffmpeg_transcode(
-    source: Path, proxy_path: Path, hls_dir: Path | None = None
-) -> FfmpegMetadata:
-    proxy_path.parent.mkdir(parents=True, exist_ok=True)
-    command = [
+# Cap height at 720p without upscaling. The comma in min() is escaped so ffmpeg's
+# filtergraph parser does not split on it, and both dimensions are forced even
+# (libx264 rejects odd width/height): width via -2, height via trunc(ih/2)*2.
+PROXY_SCALE_FILTER = r"scale=-2:min(720\,trunc(ih/2)*2)"
+
+
+def _proxy_command(source: Path, proxy_path: Path) -> list[str]:
+    return [
         "ffmpeg",
         "-y",
         "-i",
         str(source),
         "-vf",
-        "scale=-2:min(720,ih)",
+        PROXY_SCALE_FILTER,
         "-c:v",
         "libx264",
         "-preset",
         "veryfast",
         "-crf",
         "23",
+        "-pix_fmt",
+        "yuv420p",
         "-c:a",
         "aac",
         "-movflags",
         "+faststart",
         str(proxy_path),
     ]
-    subprocess.run(command, capture_output=True, check=True, text=True)
+
+
+def _hls_command(proxy_path: Path, hls_dir: Path) -> list[str]:
+    return [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(proxy_path),
+        "-codec",
+        "copy",
+        "-start_number",
+        "0",
+        "-hls_time",
+        "4",
+        "-hls_playlist_type",
+        "vod",
+        str(hls_dir / "index.m3u8"),
+    ]
+
+
+def run_ffmpeg_transcode(
+    source: Path, proxy_path: Path, hls_dir: Path | None = None
+) -> FfmpegMetadata:
+    proxy_path.parent.mkdir(parents=True, exist_ok=True)
+    _run_ffmpeg(_proxy_command(source, proxy_path))
 
     if hls_dir is not None:
         hls_dir.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(proxy_path),
-                "-codec",
-                "copy",
-                "-start_number",
-                "0",
-                "-hls_time",
-                "4",
-                "-hls_playlist_type",
-                "vod",
-                str(hls_dir / "index.m3u8"),
-            ],
-            capture_output=True,
-            check=True,
-            text=True,
-        )
+        _run_ffmpeg(_hls_command(proxy_path, hls_dir))
 
     return probe_metadata(source)
+
 
 
 class VideoIngestService:

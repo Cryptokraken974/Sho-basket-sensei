@@ -88,6 +88,21 @@ window.bvGamePage = function (config) {
       }
     },
 
+    async retranscode() {
+      this.uploading = true;
+      this.error = "";
+      try {
+        const res = await fetch(`/api/videos/${this.videoId}/retranscode`, { method: "POST" });
+        if (!res.ok) throw new Error(`Retry failed (${res.status})`);
+        this.video = await res.json();
+        this.schedulePoll();
+      } catch (e) {
+        this.error = String(e.message || e);
+      } finally {
+        this.uploading = false;
+      }
+    },
+
     async loadSample() {
       if (!this.selectedSample) return;
       this.uploading = true;
