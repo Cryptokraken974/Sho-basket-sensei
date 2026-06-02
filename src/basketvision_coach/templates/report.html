@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% set active = 'report' %}
+{% block title %}Report · {{ game.name }}{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>{{ game.name }} — report</h1>
+  {% include "_gamenav.html" %}
+</section>
+
+{% if not video %}
+<section class="panel"><p class="muted">Upload a video and tag some events first.</p></section>
+{% else %}
+<div x-data="bvReport({ videoId: {{ video.id }} })" x-init="load()">
+  <section class="panel">
+    <div class="row-between">
+      <h2>Summary</h2>
+      <button class="secondary" @click="load()">Refresh</button>
+    </div>
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-num" x-text="report.official_event_count ?? '–'"></div><div class="stat-label">Official events</div></div>
+      <div class="stat"><div class="stat-num" x-text="report.total_tagged ?? '–'"></div><div class="stat-label">Total tagged</div></div>
+      <div class="stat"><div class="stat-num" x-text="report.excluded_unreviewed_event_count ?? '–'"></div><div class="stat-label">Awaiting review</div></div>
+      <div class="stat">
+        <div class="stat-num" x-text="report.shooting_pct === null || report.shooting_pct === undefined ? '–' : report.shooting_pct + '%'"></div>
+        <div class="stat-label">Shooting (make/miss)</div>
+      </div>
+    </div>
+    <p class="muted" x-show="report.makes !== undefined"
+       x-text="`${report.makes} makes / ${report.misses} misses tagged`"></p>
+  </section>
+
+  <section class="panel">
+    <h2>Events by type</h2>
+    <div class="bars">
+      <template x-for="t in report.event_types || []" :key="t">
+        <div class="bar-row" x-show="(report.by_type[t] || 0) > 0 || true">
+          <span class="bar-label" x-text="t.replace('_', ' ')"></span>
+          <span class="bar-track">
+            <span class="bar-fill" :style="`width:${barWidth(report.by_type[t] || 0)}%`"></span>
+          </span>
+          <span class="bar-count" x-text="report.by_type[t] || 0"></span>
+        </div>
+      </template>
+    </div>
+  </section>
+
+  <section class="panel" x-show="Object.keys(report.missing_data || {}).length">
+    <h2>To finish this report</h2>
+    <ul>
+      <template x-for="[key, msg] in Object.entries(report.missing_data || {})" :key="key">
+        <li class="warn" x-text="msg"></li>
+      </template>
+    </ul>
+  </section>
+
+  <p class="muted">
+    <a class="button-link" :href="`/api/videos/${videoId}/report`">Raw JSON</a>
+    <a class="button-link" href="/games/{{ game.id }}/review">Tag more events →</a>
+  </p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}<script src="/static/app.js"></script>{% endblock %}

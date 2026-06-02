@@ -455,3 +455,106 @@ window.bvCalibration = function (config) {
     },
   };
 };
+
+window.bvReview = function (config) {
+  return {
+    videoId: config.videoId,
+    playSrc: config.playSrc,
+    eventTypes: config.eventTypes || [],
+    events: [],
+    player: "",
+    team: "",
+    error: "",
+    lastMsg: "",
+
+    fmt: fmtNumber,
+
+    async init() {
+      await this.refresh();
+    },
+
+    async refresh() {
+      const res = await fetch(`/api/videos/${this.videoId}/events`);
+      if (res.ok) this.events = await res.json();
+    },
+
+    seek(seconds) {
+      const video = this.$refs.video;
+      if (video) {
+        video.currentTime = seconds;
+        video.play().catch(() => {});
+      }
+    },
+
+    statusClass(status) {
+      if (status === "reviewed" || status === "locked") return "ready";
+      if (status === "rejected") return "failed";
+      return "processing";
+    },
+
+    onKey(event) {
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
+      const idx = parseInt(event.key, 10) - 1;
+      if (!Number.isNaN(idx) && idx >= 0 && idx < this.eventTypes.length) {
+        this.tag(this.eventTypes[idx]);
+      }
+    },
+
+    async tag(type) {
+      this.error = "";
+      const video = this.$refs.video;
+      const startS = video ? video.currentTime : 0;
+      try {
+        const res = await fetch(`/api/videos/${this.videoId}/events`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type,
+            start_s: startS,
+            player_id: this.player || null,
+            team_id: this.team || null,
+          }),
+        });
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.detail || `Tag failed (${res.status})`);
+        }
+        this.lastMsg = `Tagged ${type.replace("_", " ")} at ${fmtNumber(startS)}s`;
+        await this.refresh();
+      } catch (e) {
+        this.error = String(e.message || e);
+      }
+    },
+
+    async accept(e) {
+      await fetch(`/api/events/${e.id}/accept`, { method: "POST" });
+      await this.refresh();
+    },
+    async reject(e) {
+      await fetch(`/api/events/${e.id}/reject`, { method: "POST" });
+      await this.refresh();
+    },
+    async remove(e) {
+      await fetch(`/api/events/${e.id}`, { method: "DELETE" });
+      await this.refresh();
+    },
+  };
+};
+
+window.bvReport = function (config) {
+  return {
+    videoId: config.videoId,
+    report: {},
+
+    async load() {
+      const res = await fetch(`/api/videos/${this.videoId}/report`);
+      if (res.ok) this.report = await res.json();
+    },
+
+    barWidth(count) {
+      const counts = Object.values(this.report.by_type || {});
+      const max = counts.length ? Math.max(...counts, 1) : 1;
+      return Math.round((count / max) * 100);
+    },
+  };
+};

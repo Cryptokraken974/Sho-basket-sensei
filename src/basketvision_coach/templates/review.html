@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% set active = 'review' %}
+{% block title %}Review · {{ game.name }}{% endblock %}
+{% block content %}
+{% set play_src = (video.proxy_url if video and video.state == 'ready' else (video.original_url if video else '')) %}
+<section class="panel">
+  <h1>{{ game.name }}</h1>
+  {% include "_gamenav.html" %}
+</section>
+
+{% if not video %}
+<section class="panel"><p class="muted">Upload a video on the Playback tab first.</p></section>
+{% else %}
+<div x-data="bvReview({ videoId: {{ video.id }}, playSrc: '{{ play_src }}', eventTypes: {{ event_types | tojson }} })"
+     x-init="init()" @keydown.window="onKey($event)">
+
+  <section class="panel">
+    <h2>Tag events</h2>
+    <p class="muted">
+      Play the video, then click an event type (or press its number key) to tag it at the
+      current time. Tagged events are saved instantly and persist.
+    </p>
+    <div class="player-wrap" x-show="playSrc">
+      <video x-ref="video" :src="playSrc" controls playsinline></video>
+    </div>
+
+    <div class="tag-grid">
+      {% for t in event_types %}
+      <button class="tag-btn" @click="tag('{{ t }}')">
+        <span class="key">{{ loop.index }}</span> {{ t.replace('_', ' ') }}
+      </button>
+      {% endfor %}
+    </div>
+    <div class="inline-form">
+      <input type="text" x-model="player" placeholder="player id (optional)" />
+      <input type="text" x-model="team" placeholder="team id (optional)" />
+      <span class="muted" x-text="lastMsg"></span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="row-between">
+      <h2>Timeline (<span x-text="events.length"></span>)</h2>
+      <a class="button-link" :href="`/api/videos/${videoId}/events.csv`">Export CSV</a>
+    </div>
+    <table class="points">
+      <thead>
+        <tr><th>Time</th><th>Type</th><th>Player / Team</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        <template x-for="e in events" :key="e.id">
+          <tr :class="{ rejected: e.status === 'rejected' }">
+            <td><a href="#" @click.prevent="seek(e.start_s)" x-text="fmt(e.start_s) + 's'"></a></td>
+            <td><span class="badge" x-text="e.type.replace('_', ' ')"></span></td>
+            <td x-text="[e.player_id, e.team_id].filter(Boolean).join(' / ') || '—'"></td>
+            <td><span class="badge" :class="'badge--' + statusClass(e.status)" x-text="e.status"></span></td>
+            <td class="actions">
+              <button class="secondary" @click="accept(e)" title="Accept">✓</button>
+              <button class="secondary" @click="reject(e)" title="Reject">✕</button>
+              <button class="secondary" @click="remove(e)" title="Delete">🗑</button>
+            </td>
+          </tr>
+        </template>
+        <tr x-show="events.length === 0"><td colspan="5" class="muted">No events tagged yet.</td></tr>
+      </tbody>
+    </table>
+    <p class="error" x-show="error" x-text="error"></p>
+  </section>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}<script src="/static/app.js"></script>{% endblock %}

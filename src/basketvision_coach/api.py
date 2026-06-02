@@ -46,6 +46,14 @@ from basketvision_coach.identity import (
     RosterTeam,
     TrackIdentity,
 )
+from basketvision_coach.reporting import build_review_report
+from basketvision_coach.review import (
+    EVENT_TYPES,
+    EventStatus,
+    ReviewEvent,
+    ReviewEventCreate,
+    ReviewStore,
+)
 from basketvision_coach.schemas import (
     AnalysisRead,
     CalibrationCreate,
@@ -62,6 +70,10 @@ from basketvision_coach.schemas import (
     PlayerRead,
     ProjectedRead,
     ProjectRequest,
+    ReportRead,
+    ReviewEventCreateIn,
+    ReviewEventRead,
+    ReviewEventUpdate,
     RunRead,
     TeamCreate,
     TeamRead,
@@ -128,6 +140,22 @@ def player_to_read(player: RosterPlayer) -> PlayerRead:
     )
 
 
+def event_to_read(event: ReviewEvent) -> ReviewEventRead:
+    return ReviewEventRead(
+        id=event.id,
+        video_id=event.video_id,
+        type=event.type,
+        start_s=event.start_s,
+        end_s=event.end_s,
+        team_id=event.team_id,
+        player_id=event.player_id,
+        confidence=event.confidence,
+        source=event.source,
+        status=event.status.value,
+        reviewed=event.reviewed,
+    )
+
+
 def identity_to_read(identity: TrackIdentity) -> TrackIdentityRead:
     return TrackIdentityRead(
         id=identity.id,
@@ -151,6 +179,7 @@ def create_app(
     identity_service: IdentityReviewService | None = None,
     analyzer: VideoAnalyzer | None = None,
     click_tracker: ClickTracker | None = None,
+    review_store: ReviewStore | None = None,
 ) -> FastAPI:
     if service is not None and video_service is not None:
         raise ValueError("pass either service or video_service, not both")
@@ -160,6 +189,7 @@ def create_app(
     identity = identity_service or IdentityReviewService(
         session_factory=video_service.session_factory
     )
+    reviews = review_store or ReviewStore(video_service.data_root / "review.db")
     app = FastAPI(title="BasketVision Coach")
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
@@ -587,6 +617,92 @@ def create_app(
             for item in identity.list_track_identities(track_id=track_id)
         ]
 
+    # --- Manual review / event tagging ----------------------------------------
+
+    @app.post(
+        "/api/videos/{video_id}/events", response_model=ReviewEventRead, status_code=201
+    )
+    def create_event(video_id: int, payload: ReviewEventCreateIn) -> ReviewEventRead:
+        end_s = payload.end_s if payload.end_s is not None else payload.start_s
+        try:
+            status = EventStatus(payload.status)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"bad status: {payload.status}") from exc
+        try:
+            event = reviews.create_event(
+                ReviewEventCreate(
+                    video_id=str(video_id),
+                    type=payload.type,
+                    start_s=payload.start_s,
+                    end_s=end_s,
+                    team_id=payload.team_id,
+                    player_id=payload.player_id,
+                    confidence=payload.confidence,
+                    status=status,
+                    reviewed=status in (EventStatus.REVIEWED, EventStatus.LOCKED),
+                )
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return event_to_read(event)
+
+    @app.get("/api/videos/{video_id}/events", response_model=list[ReviewEventRead])
+    def list_events(video_id: int) -> list[ReviewEventRead]:
+        return [event_to_read(event) for event in reviews.list_events(str(video_id))]
+
+    @app.patch("/api/events/{event_id}", response_model=ReviewEventRead)
+    def update_event(event_id: int, payload: ReviewEventUpdate) -> ReviewEventRead:
+        changes: dict[str, object] = {}
+        data = payload.model_dump(exclude_unset=True)
+        if "status" in data and data["status"] is not None:
+            try:
+                changes["status"] = EventStatus(data.pop("status"))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="bad status") from exc
+            changes["reviewed"] = changes["status"] in (
+                EventStatus.REVIEWED,
+                EventStatus.LOCKED,
+            )
+        changes.update({k: v for k, v in data.items() if v is not None})
+        try:
+            event = reviews.update_event(event_id, **changes)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="event not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return event_to_read(event)
+
+    @app.post("/api/events/{event_id}/accept", response_model=ReviewEventRead)
+    def accept_event(event_id: int) -> ReviewEventRead:
+        try:
+            return event_to_read(reviews.accept_event(event_id))
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="event not found") from exc
+
+    @app.post("/api/events/{event_id}/reject", response_model=ReviewEventRead)
+    def reject_event(event_id: int) -> ReviewEventRead:
+        try:
+            return event_to_read(reviews.reject_event(event_id))
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="event not found") from exc
+
+    @app.delete("/api/events/{event_id}", status_code=204)
+    def delete_event(event_id: int) -> None:
+        reviews.delete_event(event_id)
+
+    @app.get("/api/videos/{video_id}/events.csv")
+    def export_events_csv(video_id: int, include_all: bool = False) -> FileResponse:
+        export_dir = video_service.data_root / "exports"
+        export_dir.mkdir(parents=True, exist_ok=True)
+        output = export_dir / f"events_{video_id}.csv"
+        reviews.export_events_csv(str(video_id), output, include_all=include_all)
+        return FileResponse(output, media_type="text/csv", filename=f"events_{video_id}.csv")
+
+    @app.get("/api/videos/{video_id}/report", response_model=ReportRead)
+    def video_report(video_id: int) -> ReportRead:
+        events = reviews.list_events(str(video_id))
+        return ReportRead(**build_review_report(str(video_id), events))
+
     # --- HTML pages (Jinja2 + htmx + Alpine) ----------------------------------
 
     @app.get("/", response_class=HTMLResponse)
@@ -650,6 +766,34 @@ def create_app(
             request,
             "calibration.html",
             {"game": game, "video": video_to_read(video)},
+        )
+
+    @app.get("/games/{game_id}/review", response_class=HTMLResponse)
+    def review_page(request: Request, game_id: int) -> HTMLResponse:
+        game = video_service.get_game(game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        video = video_service.latest_video_for_game(game_id)
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "review.html",
+            {
+                "game": game,
+                "video": video_to_read(video) if video else None,
+                "event_types": list(EVENT_TYPES),
+            },
+        )
+
+    @app.get("/games/{game_id}/report", response_class=HTMLResponse)
+    def report_page(request: Request, game_id: int) -> HTMLResponse:
+        game = video_service.get_game(game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        video = video_service.latest_video_for_game(game_id)
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "report.html",
+            {"game": game, "video": video_to_read(video) if video else None},
         )
 
     return app

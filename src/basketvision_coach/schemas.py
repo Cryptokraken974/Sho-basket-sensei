@@ -181,6 +181,55 @@ class ClickTrackRequest(BaseModel):
     prompts: list[ClickPromptIn] = Field(min_length=1)
 
 
+# --- Manual review / event tagging --------------------------------------------
+
+
+class ReviewEventCreateIn(BaseModel):
+    type: str
+    start_s: float
+    end_s: float | None = None
+    team_id: str | None = None
+    player_id: str | None = None
+    confidence: float = 1.0
+    status: str = "reviewed"
+
+
+class ReviewEventUpdate(BaseModel):
+    type: str | None = None
+    start_s: float | None = None
+    end_s: float | None = None
+    team_id: str | None = None
+    player_id: str | None = None
+    status: str | None = None
+
+
+class ReviewEventRead(BaseModel):
+    id: int
+    video_id: str
+    type: str
+    start_s: float
+    end_s: float
+    team_id: str | None
+    player_id: str | None
+    confidence: float
+    source: str
+    status: str
+    reviewed: bool
+
+
+class ReportRead(BaseModel):
+    total_tagged: int
+    official_event_count: int
+    excluded_unreviewed_event_count: int
+    by_type: dict[str, int]
+    by_status: dict[str, int]
+    makes: int
+    misses: int
+    shooting_pct: float | None
+    missing_data: dict[str, str]
+    event_types: list[str]
+
+
 class BoundingBoxRead(BaseModel):
     x: float
     y: float

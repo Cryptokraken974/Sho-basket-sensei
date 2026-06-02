@@ -134,6 +134,63 @@ input[type="text"], input[type="number"], select, input[type="file"] {
 .points th, .points td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); }
 .court-input { width: 5rem; }
 
+.gamenav {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.gamenav a {
+  text-decoration: none;
+  color: var(--muted);
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px 8px 0 0;
+  font-weight: 600;
+}
+.gamenav a:hover { color: var(--text); }
+.gamenav a.active { color: var(--text); background: #0f1115; border: 1px solid var(--border); border-bottom-color: transparent; }
+
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+
+.tag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.6rem;
+  margin: 0.9rem 0;
+}
+.tag-btn { text-transform: capitalize; text-align: left; }
+.tag-btn .key {
+  display: inline-block;
+  min-width: 1.3rem;
+  text-align: center;
+  background: #0f1115;
+  color: var(--accent);
+  border-radius: 4px;
+  margin-right: 0.4rem;
+  font-weight: 700;
+}
+.points tr.rejected { opacity: 0.45; }
+.points td.actions { white-space: nowrap; }
+.points td.actions button { padding: 0.2rem 0.45rem; margin-left: 0.2rem; }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.8rem;
+  margin: 0.8rem 0;
+}
+.stat { background: #0f1115; border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
+.stat-num { font-size: 2rem; font-weight: 700; color: var(--accent); }
+.stat-label { color: var(--muted); font-size: 0.85rem; }
+
+.bars { display: flex; flex-direction: column; gap: 0.4rem; }
+.bar-row { display: grid; grid-template-columns: 9rem 1fr 2rem; align-items: center; gap: 0.6rem; }
+.bar-label { color: var(--muted); text-transform: capitalize; }
+.bar-track { background: #0f1115; border-radius: 6px; height: 14px; overflow: hidden; }
+.bar-fill { display: block; height: 100%; background: var(--accent); }
+.bar-count { text-align: right; font-weight: 600; }
+
 .track-buttons { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 .track-btn { background: var(--border); color: var(--text); }
 .track-btn--active { background: var(--accent); color: #1a1d24; outline: 2px solid var(--ok); }

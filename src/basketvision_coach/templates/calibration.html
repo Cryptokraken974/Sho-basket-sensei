@@ -1,6 +1,11 @@
 {% extends "base.html" %}
+{% set active = 'calibrate' %}
 {% block title %}Calibration · {{ game.name }}{% endblock %}
 {% block content %}
+<section class="panel">
+  <h1>{{ game.name }}</h1>
+  {% include "_gamenav.html" %}
+</section>
 <div x-data="bvCalibration({ videoId: {{ video.id }} })" x-init="init()">
   <section class="panel">
     <h1>Court calibration</h1>

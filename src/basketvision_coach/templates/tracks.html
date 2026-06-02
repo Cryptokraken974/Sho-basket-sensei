@@ -1,6 +1,11 @@
 {% extends "base.html" %}
+{% set active = 'tracks' %}
 {% block title %}Track review · {{ game.name }}{% endblock %}
 {% block content %}
+<section class="panel">
+  <h1>{{ game.name }}</h1>
+  {% include "_gamenav.html" %}
+</section>
 <div x-data="bvTracks({ duration: {{ duration }} })">
   <section class="panel">
     <h1>{{ game.name }} — tracked player review</h1>

@@ -1,0 +1,7 @@
+<nav class="gamenav">
+  <a href="/games/{{ game.id }}" class="{{ 'active' if active == 'playback' else '' }}">Playback</a>
+  <a href="/games/{{ game.id }}/review" class="{{ 'active' if active == 'review' else '' }}">Review</a>
+  <a href="/games/{{ game.id }}/report" class="{{ 'active' if active == 'report' else '' }}">Report</a>
+  <a href="/games/{{ game.id }}/calibrate" class="{{ 'active' if active == 'calibrate' else '' }}">Calibration</a>
+  <a href="/games/{{ game.id }}/tracks" class="{{ 'active' if active == 'tracks' else '' }}">Tracks</a>
+</nav>
