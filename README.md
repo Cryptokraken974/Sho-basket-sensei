@@ -42,9 +42,13 @@ htmx (form posts) and Alpine.js (client state). Pages:
 
 - **`/`** — list and create games.
 - **`/games/{id}`** — upload an MP4, watch background processing update live,
-  then play the 720p proxy with a CV overlay canvas (detection boxes, track
-  trails, ball path) and per-layer toggles. Paste a detection/tracking run id
-  to load its overlays and live job progress.
+  then play the 720p proxy (or the original directly if `ffmpeg` is not
+  installed) with a CV overlay canvas (detection boxes, track trails, ball
+  path) and per-layer toggles. Click **Run demo analysis** to fabricate
+  synthetic detections and run them through the real detection + tracking
+  pipeline so the overlays render over your video — handy for seeing the
+  system work before a trained detector is wired in. You can also paste a
+  detection/tracking run id from the CV worker to load a real run.
 - **`/games/{id}/calibrate`** — capture a frame, click court landmarks to map
   pixels to court coordinates, and save a calibration.
 

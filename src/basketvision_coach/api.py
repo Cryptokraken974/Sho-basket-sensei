@@ -27,6 +27,7 @@ from basketvision_coach.cv_pipeline import (
     VisionPipeline,
 )
 from basketvision_coach.db import build_session_factory
+from basketvision_coach.demo_data import DEMO_HEIGHT, DEMO_WIDTH, generate_demo_frames
 from basketvision_coach.identity import (
     IdentityReviewService,
     RosterPlayer,
@@ -36,6 +37,7 @@ from basketvision_coach.identity import (
 from basketvision_coach.schemas import (
     CalibrationCreate,
     CalibrationRead,
+    DemoAnalysisRead,
     DetectionRecordRead,
     DetectionRunCreate,
     GameCreate,
@@ -69,12 +71,14 @@ def default_service() -> VideoIngestService:
 
 def video_to_read(video: Video) -> VideoRead:
     proxy_url = f"/api/videos/{video.id}/proxy_720p.mp4" if video.proxy_path else None
+    original_url = f"/api/videos/{video.id}/original.mp4" if video.original_path else None
     return VideoRead(
         id=video.id,
         game_id=video.game_id,
         state=video.state.value,
         original_path=video.original_path,
         proxy_url=proxy_url,
+        original_url=original_url,
         proxy_path=video.proxy_path,
         hls_path=video.hls_path,
         fps=video.fps,
@@ -209,6 +213,16 @@ def create_app(
         if not proxy.exists():
             raise HTTPException(status_code=404, detail="Proxy file is missing")
         return FileResponse(proxy, media_type="video/mp4", filename="proxy_720p.mp4")
+
+    @app.get("/api/videos/{video_id}/original.mp4")
+    def get_original(video_id: int) -> FileResponse:
+        video = video_service.get_video(video_id)
+        if video is None or not video.original_path:
+            raise HTTPException(status_code=404, detail="Video not found")
+        original = Path(video.original_path)
+        if not original.exists():
+            raise HTTPException(status_code=404, detail="Original file is missing")
+        return FileResponse(original, media_type="video/mp4", filename="original.mp4")
 
     # --- Court calibration ----------------------------------------------------
 
@@ -354,6 +368,47 @@ def create_app(
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="detection run not found") from exc
         return RunRead(run_id=result.run_id, progress=_progress_to_read(result.progress))
+
+    @app.post(
+        "/api/videos/{video_id}/demo-analysis",
+        response_model=DemoAnalysisRead,
+        status_code=201,
+    )
+    def run_demo_analysis(
+        video_id: int, duration_s: float | None = None, fps: float | None = None
+    ) -> DemoAnalysisRead:
+        """Fabricate detections and run the real detection+tracking pipeline.
+
+        This does not look at video pixels (the project has no trained detector);
+        it demonstrates the tracking and overlay system end to end on synthetic data.
+        """
+        video = video_service.get_video(video_id)
+        if video is None:
+            raise HTTPException(status_code=404, detail="Video not found")
+        clip_duration = duration_s or video.duration_s or 8.0
+        clip_fps = fps or video.fps or 25.0
+        frames = generate_demo_frames(duration_s=clip_duration, fps=clip_fps)
+
+        pipeline = VisionPipeline(store)
+        detection = pipeline.run_detection(
+            DetectionJobSpec(
+                video_id=str(video_id),
+                model=ModelSpec(name="demo-synthetic", version="1.0"),
+                confidence_threshold=0.25,
+                frame_detections=frames,
+            )
+        )
+        tracking = pipeline.run_tracking(
+            TrackingJobSpec(video_id=str(video_id), detection_run_id=detection.run_id)
+        )
+        return DemoAnalysisRead(
+            detection_run_id=detection.run_id,
+            tracking_run_id=tracking.run_id,
+            source_width=DEMO_WIDTH,
+            source_height=DEMO_HEIGHT,
+            fps=clip_fps,
+            frame_count=len(frames),
+        )
 
     @app.get("/api/runs/{run_id}/progress", response_model=JobProgressRead)
     def get_run_progress(run_id: str) -> JobProgressRead:

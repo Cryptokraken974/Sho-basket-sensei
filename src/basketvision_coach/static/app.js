@@ -43,11 +43,28 @@ window.bvGamePage = function (config) {
     detections: [],
     tracks: [],
     rafId: null,
+    sourceW: 0,
+    sourceH: 0,
+    overlayFps: 30,
+    demoRunning: false,
 
     fmt: fmtNumber,
 
-    get proxyUrl() {
-      return this.video && this.video.proxy_url ? this.video.proxy_url : "";
+    // Prefer the transcoded 720p proxy; fall back to the uploaded original so
+    // playback (and the demo overlay) work even without ffmpeg.
+    get playSrc() {
+      if (!this.video) return "";
+      if (this.video.state === "ready" && this.video.proxy_url) return this.video.proxy_url;
+      return this.video.original_url || "";
+    },
+    get usingOriginal() {
+      return !!this.video && this.video.state !== "ready" && !!this.video.original_url;
+    },
+    get canPlay() {
+      return !!this.playSrc;
+    },
+    get hasOverlayData() {
+      return this.detections.length > 0 || this.tracks.length > 0;
     },
 
     async init() {
@@ -121,8 +138,16 @@ window.bvGamePage = function (config) {
 
     currentFrame() {
       const video = this.$refs.video;
-      const fps = this.video && this.video.fps ? this.video.fps : 30;
-      return video ? Math.round(video.currentTime * fps) : 0;
+      return video ? Math.round(video.currentTime * this.overlayFps) : 0;
+    },
+
+    // Pixel space the loaded detections live in (demo: virtual 1000-space;
+    // real runs: the played video's native resolution).
+    sourceWidth() {
+      return this.sourceW || (this.$refs.video ? this.$refs.video.videoWidth : 0);
+    },
+    sourceHeight() {
+      return this.sourceH || (this.$refs.video ? this.$refs.video.videoHeight : 0);
     },
 
     drawOverlay() {
@@ -131,8 +156,10 @@ window.bvGamePage = function (config) {
       if (!video || !canvas || !video.videoWidth) return;
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const sx = canvas.width / video.videoWidth;
-      const sy = canvas.height / video.videoHeight;
+      const srcW = this.sourceWidth() || video.videoWidth;
+      const srcH = this.sourceHeight() || video.videoHeight;
+      const sx = canvas.width / srcW;
+      const sy = canvas.height / srcH;
       const frame = this.currentFrame();
 
       if (this.overlays.detection_boxes) {
@@ -178,6 +205,43 @@ window.bvGamePage = function (config) {
       }
     },
 
+    async runDemo() {
+      this.demoRunning = true;
+      this.error = "";
+      try {
+        const video = this.$refs.video;
+        const params = new URLSearchParams();
+        if (video && Number.isFinite(video.duration) && video.duration > 0) {
+          params.set("duration_s", String(video.duration));
+        }
+        const res = await fetch(
+          `/api/videos/${this.videoId}/demo-analysis?${params.toString()}`,
+          { method: "POST" }
+        );
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.detail || `Demo analysis failed (${res.status})`);
+        }
+        const body = await res.json();
+        this.sourceW = body.source_width;
+        this.sourceH = body.source_height;
+        this.overlayFps = body.fps;
+        this.activeRunId = body.detection_run_id;
+        const [pRes, dRes, tRes] = await Promise.all([
+          fetch(`/api/runs/${body.detection_run_id}/progress`),
+          fetch(`/api/runs/${body.detection_run_id}/detections`),
+          fetch(`/api/runs/${body.tracking_run_id}/tracks`),
+        ]);
+        this.progress = pRes.ok ? await pRes.json() : null;
+        this.detections = dRes.ok ? await dRes.json() : [];
+        this.tracks = tRes.ok ? await tRes.json() : [];
+      } catch (e) {
+        this.error = String(e.message || e);
+      } finally {
+        this.demoRunning = false;
+      }
+    },
+
     async loadRun(event) {
       event.preventDefault();
       const runId = this.runIdInput.trim();
@@ -191,6 +255,15 @@ window.bvGamePage = function (config) {
         ]);
         if (!pRes.ok) throw new Error(`Run ${runId} not found`);
         this.activeRunId = runId;
+        // Real runs are in the played video's native pixel space.
+        this.sourceW = 0;
+        this.sourceH = 0;
+        const video = this.$refs.video;
+        this.overlayFps = this.video && this.video.fps ? this.video.fps : 30;
+        if (video && video.videoWidth) {
+          this.sourceW = video.videoWidth;
+          this.sourceH = video.videoHeight;
+        }
         this.progress = await pRes.json();
         this.detections = dRes.ok ? await dRes.json() : [];
         this.tracks = tRes.ok ? await tRes.json() : [];

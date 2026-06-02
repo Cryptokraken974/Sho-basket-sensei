@@ -27,31 +27,46 @@
     <section class="panel error-panel">
       <h2>Transcode failed</h2>
       <p x-text="video.error_message || 'Unknown error'"></p>
+      <p class="muted">You can still play the uploaded original and run a demo analysis below.</p>
     </section>
   </template>
 
-  <template x-if="video && (video.state === 'uploaded' || video.state === 'processing')">
+  <template x-if="video && (video.state === 'uploaded' || video.state === 'processing') && !video.proxy_url">
     <section class="panel">
       <h2>Processing…</h2>
       <div class="spinner"></div>
-      <p class="muted">Generating a 720p playback proxy. This updates automatically.</p>
+      <p class="muted">Generating a 720p playback proxy. You can play the original below meanwhile.</p>
     </section>
   </template>
 
-  <template x-if="video && video.state === 'ready'">
+  <template x-if="canPlay">
     <section class="panel">
       <h2>Playback &amp; overlays</h2>
+      <p class="muted" x-show="usingOriginal">
+        Playing the uploaded original (no 720p proxy — install ffmpeg for transcoded playback).
+      </p>
       <div class="player-wrap">
-        <video x-ref="video" :src="proxyUrl" controls playsinline
+        <video x-ref="video" :src="playSrc" controls playsinline
                @loadedmetadata="onVideoReady()"></video>
         <canvas x-ref="overlay" class="overlay-canvas"></canvas>
+      </div>
+
+      <div class="demo-bar">
+        <button @click="runDemo()" :disabled="demoRunning"
+                x-text="demoRunning ? 'Analyzing…' : '▶ Run demo analysis'"></button>
+        <span class="muted">
+          Synthetic detections that exercise the real tracking + overlay pipeline
+          (no trained detector yet).
+        </span>
       </div>
 
       <div class="overlay-controls">
         <label><input type="checkbox" x-model="overlays.detection_boxes" /> Detection boxes</label>
         <label><input type="checkbox" x-model="overlays.track_trails" /> Track trails</label>
         <label><input type="checkbox" x-model="overlays.ball_path" /> Ball path</label>
-        <span class="muted" x-show="!activeRunId">No detection run loaded — overlays are empty.</span>
+        <span class="muted" x-show="!hasOverlayData">
+          No analysis loaded — click “Run demo analysis”.
+        </span>
       </div>
 
       <dl class="meta">
@@ -68,12 +83,12 @@
     </section>
   </template>
 
-  <template x-if="video && video.state === 'ready'">
+  <template x-if="canPlay">
     <section class="panel">
       <h2>Processing jobs</h2>
       <p class="muted">
-        Detection/tracking runs are produced by the CV worker. Paste a run id to load its
-        overlays and live progress.
+        The demo above produces a detection + tracking run. To load a run from the CV worker
+        instead, paste its detection run id.
       </p>
       <form class="inline-form" @submit.prevent="loadRun($event)">
         <input type="text" x-model="runIdInput" placeholder="detection run id" />

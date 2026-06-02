@@ -26,6 +26,7 @@ class VideoRead(BaseModel):
     original_path: str
     proxy_path: str | None
     proxy_url: str | None
+    original_url: str | None
     hls_path: str | None
     fps: float | None
     width: int | None
@@ -147,6 +148,15 @@ class JobProgressRead(BaseModel):
 class RunRead(BaseModel):
     run_id: str
     progress: JobProgressRead
+
+
+class DemoAnalysisRead(BaseModel):
+    detection_run_id: str
+    tracking_run_id: str
+    source_width: float
+    source_height: float
+    fps: float
+    frame_count: int
 
 
 class BoundingBoxRead(BaseModel):
