@@ -82,7 +82,9 @@ def probe_metadata(source: Path) -> FfmpegMetadata:
     )
 
 
-def run_ffmpeg_transcode(source: Path, proxy_path: Path, hls_dir: Path | None = None) -> FfmpegMetadata:
+def run_ffmpeg_transcode(
+    source: Path, proxy_path: Path, hls_dir: Path | None = None
+) -> FfmpegMetadata:
     proxy_path.parent.mkdir(parents=True, exist_ok=True)
     command = [
         "ffmpeg",

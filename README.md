@@ -21,6 +21,20 @@ uv run mypy src tests
 uv run ruff check .
 ```
 
+These checks also run in CI (`.github/workflows/ci.yml`) in a clean environment
+so missing runtime dependencies are caught before merge.
+
+## Running the web app
+
+```bash
+# ffmpeg/ffprobe are required for real video transcoding
+uv run uvicorn basketvision_coach.api:app --reload
+```
+
+Then open <http://localhost:8000/>. The data directory (SQLite database and
+stored video assets) defaults to `./data` and `DATABASE_URL` overrides the
+database location.
+
 ## CV processing pipeline
 
 `basketvision_coach.cv_pipeline` contains dependency-light contracts for the planned video worker:

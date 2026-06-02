@@ -7,13 +7,21 @@ requires-python = ">=3.11"
 authors = [{ name = "BasketVision Coach Maintainers" }]
 license = { text = "MIT" }
 keywords = ["basketball", "computer-vision", "coaching", "sports-analytics"]
-dependencies = []
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "pydantic>=2.6",
+    "sqlalchemy>=2.0",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+]
 
 [project.optional-dependencies]
 dev = [
     "mypy>=1.10",
     "pytest>=8.2",
     "ruff>=0.5",
+    "httpx>=0.27",
 ]
 
 [project.scripts]

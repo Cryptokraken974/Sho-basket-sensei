@@ -138,7 +138,9 @@ def create_app(service: VideoIngestService | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:
         games = video_service.list_games()
-        items = "".join(f'<li><a href="/games/{game.id}">{escape(game.name)}</a></li>' for game in games)
+        items = "".join(
+            f'<li><a href="/games/{game.id}">{escape(game.name)}</a></li>' for game in games
+        )
         return HTMLResponse(f"<h1>BasketVision Coach</h1><ul>{items}</ul>")
 
     return app

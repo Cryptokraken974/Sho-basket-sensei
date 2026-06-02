@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -11,8 +10,13 @@ from sqlalchemy.pool import StaticPool
 
 from basketvision_coach.api import create_app
 from basketvision_coach.db import Base
-from basketvision_coach.video import FfmpegMetadata, VideoIngestService, frame_idx_to_ts_s, ts_s_to_frame_idx
-from basketvision_coach.video_models import Video, VideoState
+from basketvision_coach.video import (
+    FfmpegMetadata,
+    VideoIngestService,
+    frame_idx_to_ts_s,
+    ts_s_to_frame_idx,
+)
+from basketvision_coach.video_models import VideoState
 
 
 def make_service(tmp_path: Path, metadata: FfmpegMetadata | None = None) -> VideoIngestService:
