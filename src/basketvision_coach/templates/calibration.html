@@ -19,53 +19,52 @@
   <section class="panel">
     <h2>1. Capture a frame</h2>
     <div class="player-wrap">
-      <video x-ref="video" :src="proxyUrl" controls playsinline crossorigin="anonymous"></video>
+      <video x-ref="video" :src="proxyUrl" controls playsinline></video>
     </div>
     <button @click="capture()">Capture current frame</button>
     <span class="muted" x-show="captured" x-text="'Captured at ts = ' + fmt(capturedTs) + ' s'"></span>
+    <p class="error" x-show="error && !captured" x-text="error"></p>
   </section>
 
-  <template x-if="captured">
-    <section class="panel">
-      <h2>2. Place landmarks</h2>
-      <div class="landmark-picker">
-        <label>Landmark
-          <select x-model="selectedLandmark">
-            <template x-for="lm in landmarks" :key="lm">
-              <option :value="lm" x-text="lm"></option>
-            </template>
-          </select>
-        </label>
-        <span class="muted">Click on the frame to place the selected landmark.</span>
-      </div>
-      <div class="frame-wrap">
-        <canvas x-ref="frame" class="frame-canvas" @click="placePoint($event)"></canvas>
-      </div>
-
-      <table class="points">
-        <thead><tr><th>Landmark</th><th>image x,y</th><th>court x,y</th><th></th></tr></thead>
-        <tbody>
-          <template x-for="(p, i) in points" :key="p.landmark">
-            <tr>
-              <td x-text="p.landmark"></td>
-              <td x-text="fmt(p.image_x) + ', ' + fmt(p.image_y)"></td>
-              <td>
-                <input type="number" step="0.1" x-model.number="p.court_x" class="court-input" />
-                <input type="number" step="0.1" x-model.number="p.court_y" class="court-input" />
-              </td>
-              <td><button @click="points.splice(i, 1)">✕</button></td>
-            </tr>
+  <section class="panel" x-show="captured">
+    <h2>2. Place landmarks</h2>
+    <div class="landmark-picker">
+      <label>Landmark
+        <select x-model="selectedLandmark">
+          <template x-for="lm in landmarks" :key="lm">
+            <option :value="lm" x-text="lm"></option>
           </template>
-          <tr x-show="points.length === 0"><td colspan="4" class="muted">No points yet.</td></tr>
-        </tbody>
-      </table>
+        </select>
+      </label>
+      <span class="muted">Click on the frame to place the selected landmark.</span>
+    </div>
+    <div class="frame-wrap">
+      <canvas x-ref="frame" class="frame-canvas" @click="placePoint($event)"></canvas>
+    </div>
 
-      <button @click="save()" :disabled="points.length < 4 || saving"
-              x-text="saving ? 'Saving…' : 'Save calibration (' + points.length + '/4)'"></button>
-      <p class="error" x-show="error" x-text="error"></p>
-      <p class="success" x-show="savedId" x-text="'Saved calibration ' + savedId"></p>
-    </section>
-  </template>
+    <table class="points">
+      <thead><tr><th>Landmark</th><th>image x,y</th><th>court x,y</th><th></th></tr></thead>
+      <tbody>
+        <template x-for="(p, i) in points" :key="p.landmark">
+          <tr>
+            <td x-text="p.landmark"></td>
+            <td x-text="fmt(p.image_x) + ', ' + fmt(p.image_y)"></td>
+            <td>
+              <input type="number" step="0.1" x-model.number="p.court_x" class="court-input" />
+              <input type="number" step="0.1" x-model.number="p.court_y" class="court-input" />
+            </td>
+            <td><button @click="points.splice(i, 1)">✕</button></td>
+          </tr>
+        </template>
+        <tr x-show="points.length === 0"><td colspan="4" class="muted">No points yet.</td></tr>
+      </tbody>
+    </table>
+
+    <button @click="save()" :disabled="points.length < 4 || saving"
+            x-text="saving ? 'Saving…' : 'Save calibration (' + points.length + '/4)'"></button>
+    <p class="error" x-show="error && captured" x-text="error"></p>
+    <p class="success" x-show="savedId" x-text="'Saved calibration ' + savedId"></p>
+  </section>
 </div>
 {% endblock %}
 

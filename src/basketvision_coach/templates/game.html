@@ -84,6 +84,14 @@
         </span>
       </div>
 
+      <div class="demo-bar" x-show="hasOverlayData">
+        <a class="button-link" :href="overlayDownloadUrl" download>⬇ Download annotated video</a>
+        <span class="muted">
+          Burns the checked layers into the video (best with a real YOLO run;
+          may take a while for long clips).
+        </span>
+      </div>
+
       <dl class="meta">
         <dt>Duration</dt><dd x-text="fmt(video.duration_s) + ' s'"></dd>
         <dt>FPS</dt><dd x-text="fmt(video.fps)"></dd>

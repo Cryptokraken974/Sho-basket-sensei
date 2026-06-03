@@ -46,6 +46,7 @@ from basketvision_coach.identity import (
     RosterTeam,
     TrackIdentity,
 )
+from basketvision_coach.overlay_render import OverlayLayers, render_overlay_video
 from basketvision_coach.reporting import build_review_report
 from basketvision_coach.review import (
     EVENT_TYPES,
@@ -533,6 +534,40 @@ def create_app(
             object_count=result.object_count,
             engine=result.engine,
         )
+
+    @app.get("/api/videos/{video_id}/overlay.mp4")
+    def export_overlay_video(
+        video_id: int,
+        detection_run_id: str,
+        tracking_run_id: str = "",
+        boxes: bool = True,
+        trails: bool = True,
+        ball: bool = True,
+    ) -> FileResponse:
+        """Burn the run's overlays into the analyzed video and return it for download."""
+        video = video_service.get_video(video_id)
+        if video is None:
+            raise HTTPException(status_code=404, detail="Video not found")
+        source = video.proxy_path if video.proxy_path else video.original_path
+        if not source or not Path(source).exists():
+            raise HTTPException(status_code=409, detail="No playable video file to annotate")
+        detections = store.list_detections(detection_run_id)
+        tracks = store.list_tracks(tracking_run_id) if tracking_run_id else []
+        if not detections and not tracks:
+            raise HTTPException(status_code=404, detail="Run has no detections; run analysis first")
+        out_path = video_service.data_root / "exports" / f"overlay_{video_id}.mp4"
+        try:
+            render_overlay_video(
+                source=Path(source),
+                detections=detections,
+                tracks=tracks,
+                layers=OverlayLayers(detection_boxes=boxes, track_trails=trails, ball_path=ball),
+                out_path=out_path,
+            )
+        except RuntimeError as exc:
+            status = 503 if "opencv" in str(exc).lower() else 500
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
+        return FileResponse(out_path, media_type="video/mp4", filename=f"overlay_{video_id}.mp4")
 
     @app.post(
         "/api/videos/{video_id}/click-track",

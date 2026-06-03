@@ -38,6 +38,7 @@ window.bvGamePage = function (config) {
     pollTimer: null,
     overlays: { detection_boxes: true, track_trails: true, ball_path: true },
     activeRunId: null,
+    trackingRunId: null,
     runIdInput: "",
     progress: null,
     detections: [],
@@ -268,9 +269,22 @@ window.bvGamePage = function (config) {
         fetch(`/api/runs/${trackingRunId}/tracks`),
       ]);
       this.activeRunId = detectionRunId;
+      this.trackingRunId = trackingRunId;
       this.progress = pRes.ok ? await pRes.json() : null;
       this.detections = dRes.ok ? await dRes.json() : [];
       this.tracks = tRes.ok ? await tRes.json() : [];
+    },
+
+    get overlayDownloadUrl() {
+      if (!this.activeRunId) return "";
+      const p = new URLSearchParams({
+        detection_run_id: this.activeRunId,
+        tracking_run_id: this.trackingRunId || "",
+        boxes: String(this.overlays.detection_boxes),
+        trails: String(this.overlays.track_trails),
+        ball: String(this.overlays.ball_path),
+      });
+      return `/api/videos/${this.videoId}/overlay.mp4?${p.toString()}`;
     },
 
     async runAnalysis() {
