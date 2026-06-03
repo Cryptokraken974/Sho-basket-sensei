@@ -1,7 +1,7 @@
 """Real video detection + tracking analysis.
 
 This wires actual computer-vision inference (YOLO detection + ByteTrack
-tracking) into the same persistence/overlay contracts the synthetic demo uses.
+tracking) into the persistence and overlay contracts used across the app.
 
 The heavy runtime dependencies (``ultralytics``, ``opencv-python``, ``torch``)
 are intentionally **not** part of the package's declared dependencies: they are

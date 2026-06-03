@@ -39,7 +39,7 @@
     <section class="panel error-panel">
       <h2>Transcode failed</h2>
       <p x-text="video.error_message || 'Unknown error'"></p>
-      <p class="muted">You can still play the uploaded original and run a demo analysis below.</p>
+      <p class="muted">You can still play the uploaded original and run analysis below.</p>
       <button class="secondary" @click="retranscode()" :disabled="uploading"
               x-text="uploading ? 'Retrying…' : 'Retry transcode'"></button>
     </section>
@@ -67,13 +67,11 @@
                 @click="onCanvasClick($event)"></canvas>
       </div>
 
-      <div class="demo-bar">
+      <div class="action-bar">
         <button @click="runAnalysis()" :disabled="analyzing"
                 x-text="analyzing ? 'Analyzing…' : '▶ Run analysis (YOLO)'"></button>
         <button class="secondary" x-show="hasSavedAnalysis" @click="loadSavedAnalysis()"
                 :disabled="analyzing">↺ Load saved analysis</button>
-        <button class="secondary" @click="runDemo()" :disabled="demoRunning"
-                x-text="demoRunning ? 'Analyzing…' : 'Run demo (synthetic)'"></button>
         <span class="muted" x-text="engineNote"></span>
       </div>
 
@@ -82,11 +80,11 @@
         <label><input type="checkbox" x-model="overlays.track_trails" /> Track trails</label>
         <label><input type="checkbox" x-model="overlays.ball_path" /> Ball path</label>
         <span class="muted" x-show="!hasOverlayData">
-          No analysis loaded — click “Run demo analysis”.
+          No analysis loaded — click “Run analysis (YOLO)”.
         </span>
       </div>
 
-      <div class="demo-bar" x-show="hasOverlayData">
+      <div class="action-bar" x-show="hasOverlayData">
         <button @click="downloadOverlay()" :disabled="exporting"
                 x-text="exporting ? 'Rendering…' : '⬇ Download annotated video'"></button>
         <span class="muted">
@@ -141,7 +139,7 @@
     <section class="panel">
       <h2>Processing jobs</h2>
       <p class="muted">
-        The demo above produces a detection + tracking run. To load a run from the CV worker
+        Running analysis produces a detection + tracking run. To load a run by id
         instead, paste its detection run id.
       </p>
       <form class="inline-form" @submit.prevent="loadRun($event)">
@@ -165,5 +163,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v={{ asset_version }}"></script>
 {% endblock %}

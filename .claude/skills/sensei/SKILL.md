@@ -22,7 +22,7 @@ brew install uv ffmpeg     # uv runs the app; ffmpeg transcodes 720p proxies
 ```
 
 `ffmpeg` is optional — without it, playback falls back to the uploaded original,
-and the demo/review/report/calibration/roster features still work.
+and the review/report/calibration/roster features still work.
 
 ## Build / install (core app)
 
@@ -146,7 +146,7 @@ CI (`.github/workflows/ci.yml`) runs all three in a clean env on every PR.
 
 - `/` — games list + create; per-game tabs below.
 - `/games/{id}` — upload OR **load a bundled sample**, playback, overlays,
-  **Run demo** (synthetic, no CV), **Run analysis (YOLO)**,
+  **Run analysis (YOLO)**, **Load saved analysis**, **download annotated video**,
   **Click-to-track (SAM 2)**, **Retry transcode**, jobs panel.
 - `/games/{id}/review` — tag events at the current time (keys 1–8), timeline,
   accept/reject/delete, CSV export. No CV needed.

@@ -154,15 +154,6 @@ class RunRead(BaseModel):
     progress: JobProgressRead
 
 
-class DemoAnalysisRead(BaseModel):
-    detection_run_id: str
-    tracking_run_id: str
-    source_width: float
-    source_height: float
-    fps: float
-    frame_count: int
-
-
 class AnalysisRead(BaseModel):
     detection_run_id: str
     tracking_run_id: str

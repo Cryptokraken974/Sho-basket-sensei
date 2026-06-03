@@ -115,7 +115,7 @@ def main() -> int:
     print("\nSummary")
     print(f"  Run analysis (YOLO):   {'READY' if yolo_ready else 'not ready'}")
     print(f"  Click-to-track (SAM2): {'READY' if sam_ready else 'not ready'}")
-    print("\nThe demo, review, report, calibration and roster features work without any of this.")
+    print("\nThe review, report, calibration and roster features work without any of this.")
     return 0
 
 

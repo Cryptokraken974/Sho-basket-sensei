@@ -45,7 +45,6 @@ from basketvision_coach.cv_pipeline import (
     VisionPipeline,
 )
 from basketvision_coach.db import build_session_factory, data_root_from_env
-from basketvision_coach.demo_data import DEMO_HEIGHT, DEMO_WIDTH, generate_demo_frames
 from basketvision_coach.identity import (
     IdentityReviewService,
     RosterPlayer,
@@ -67,7 +66,6 @@ from basketvision_coach.schemas import (
     CalibrationCreate,
     CalibrationRead,
     ClickTrackRequest,
-    DemoAnalysisRead,
     DetectionRecordRead,
     DetectionRunCreate,
     GameCreate,
@@ -98,6 +96,20 @@ from basketvision_coach.video_models import Video, VideoState
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _TEMPLATES = Jinja2Templates(directory=str(_PACKAGE_DIR / "templates"))
 _STATIC_DIR = _PACKAGE_DIR / "static"
+
+
+def _asset_version() -> str:
+    """Cache-busting token from the static assets' mtimes (changes on every edit)."""
+
+    latest = 0.0
+    for name in ("app.js", "app.css"):
+        path = _STATIC_DIR / name
+        if path.exists():
+            latest = max(latest, path.stat().st_mtime)
+    return str(int(latest))
+
+
+_TEMPLATES.env.globals["asset_version"] = _asset_version()
 
 
 def default_service() -> VideoIngestService:
@@ -462,47 +474,6 @@ def create_app(
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="detection run not found") from exc
         return RunRead(run_id=result.run_id, progress=_progress_to_read(result.progress))
-
-    @app.post(
-        "/api/videos/{video_id}/demo-analysis",
-        response_model=DemoAnalysisRead,
-        status_code=201,
-    )
-    def run_demo_analysis(
-        video_id: int, duration_s: float | None = None, fps: float | None = None
-    ) -> DemoAnalysisRead:
-        """Fabricate detections and run the real detection+tracking pipeline.
-
-        This does not look at video pixels (the project has no trained detector);
-        it demonstrates the tracking and overlay system end to end on synthetic data.
-        """
-        video = video_service.get_video(video_id)
-        if video is None:
-            raise HTTPException(status_code=404, detail="Video not found")
-        clip_duration = duration_s or video.duration_s or 8.0
-        clip_fps = fps or video.fps or 25.0
-        frames = generate_demo_frames(duration_s=clip_duration, fps=clip_fps)
-
-        pipeline = VisionPipeline(store)
-        detection = pipeline.run_detection(
-            DetectionJobSpec(
-                video_id=str(video_id),
-                model=ModelSpec(name="demo-synthetic", version="1.0"),
-                confidence_threshold=0.25,
-                frame_detections=frames,
-            )
-        )
-        tracking = pipeline.run_tracking(
-            TrackingJobSpec(video_id=str(video_id), detection_run_id=detection.run_id)
-        )
-        return DemoAnalysisRead(
-            detection_run_id=detection.run_id,
-            tracking_run_id=tracking.run_id,
-            source_width=DEMO_WIDTH,
-            source_height=DEMO_HEIGHT,
-            fps=clip_fps,
-            frame_count=len(frames),
-        )
 
     @app.post(
         "/api/videos/{video_id}/analysis",

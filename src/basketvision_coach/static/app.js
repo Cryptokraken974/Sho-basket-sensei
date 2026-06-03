@@ -47,9 +47,8 @@ window.bvGamePage = function (config) {
     sourceW: 0,
     sourceH: 0,
     overlayFps: 30,
-    demoRunning: false,
     analyzing: false,
-    engineNote: "YOLO+ByteTrack detects players & ball (needs the CV runtime). Demo uses synthetic data.",
+    engineNote: "YOLO+ByteTrack detects players & the ball (needs the CV runtime).",
     clickMode: false,
     clickLabel: "Player 1",
     clickPrompts: [],
@@ -62,7 +61,7 @@ window.bvGamePage = function (config) {
     fmt: fmtNumber,
 
     // Prefer the transcoded 720p proxy; fall back to the uploaded original so
-    // playback (and the demo overlay) work even without ffmpeg.
+    // playback (and overlays) work even without ffmpeg.
     get playSrc() {
       if (!this.video) return "";
       if (this.video.state === "ready" && this.video.proxy_url) return this.video.proxy_url;
@@ -203,8 +202,7 @@ window.bvGamePage = function (config) {
       return video ? Math.round(video.currentTime * this.overlayFps) : 0;
     },
 
-    // Pixel space the loaded detections live in (demo: virtual 1000-space;
-    // real runs: the played video's native resolution).
+    // Pixel space the loaded detections live in (the analyzed video's resolution).
     sourceWidth() {
       return this.sourceW || (this.$refs.video ? this.$refs.video.videoWidth : 0);
     },
@@ -415,35 +413,6 @@ window.bvGamePage = function (config) {
         this.error = String(e.message || e);
       } finally {
         this.clickTracking = false;
-      }
-    },
-
-    async runDemo() {
-      this.demoRunning = true;
-      this.error = "";
-      try {
-        const video = this.$refs.video;
-        const params = new URLSearchParams();
-        if (video && Number.isFinite(video.duration) && video.duration > 0) {
-          params.set("duration_s", String(video.duration));
-        }
-        const res = await fetch(
-          `/api/videos/${this.videoId}/demo-analysis?${params.toString()}`,
-          { method: "POST" }
-        );
-        if (!res.ok) {
-          const detail = await res.json().catch(() => ({}));
-          throw new Error(detail.detail || `Demo analysis failed (${res.status})`);
-        }
-        const body = await res.json();
-        this.sourceW = body.source_width;
-        this.sourceH = body.source_height;
-        this.overlayFps = body.fps;
-        await this.loadRunPair(body.detection_run_id, body.tracking_run_id);
-      } catch (e) {
-        this.error = String(e.message || e);
-      } finally {
-        this.demoRunning = false;
       }
     },
 

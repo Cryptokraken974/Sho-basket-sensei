@@ -72,14 +72,12 @@ The web UI is server-rendered with Jinja2 and progressively enhanced with
 htmx (form posts) and Alpine.js (client state). Pages:
 
 - **`/`** — list and create games.
-- **`/games/{id}`** — upload an MP4, watch background processing update live,
-  then play the 720p proxy (or the original directly if `ffmpeg` is not
-  installed) with a CV overlay canvas (detection boxes, track trails, ball
-  path) and per-layer toggles. Click **Run demo analysis** to fabricate
-  synthetic detections and run them through the real detection + tracking
-  pipeline so the overlays render over your video — handy for seeing the
-  system work before a trained detector is wired in. You can also paste a
-  detection/tracking run id from the CV worker to load a real run.
+- **`/games/{id}`** — upload an MP4 (or load a bundled sample), watch background
+  processing update live, then play the 720p proxy (or the original directly if
+  `ffmpeg` is not installed) with a CV overlay canvas (detection boxes, track
+  trails, ball path) and per-layer toggles. **Run analysis (YOLO)** detects
+  players and the ball; the result is saved so you can **Load saved analysis**
+  later without re-running, and **download the annotated video**.
 - **`/games/{id}/calibrate`** — capture a frame, click court landmarks to map
   pixels to court coordinates, and save a calibration.
 
@@ -95,10 +93,9 @@ install it where you have a GPU/MPS and network access:
 pip install ultralytics opencv-python-headless
 ```
 
-Without it, the button returns a clear "install the CV runtime" message and you
-can still use **Run demo (synthetic)**. The analyzer is dependency-injected
-(`create_app(analyzer=...)`), so it is covered in tests with a fake and swappable
-for other engines.
+Without it, the button returns a clear "install the CV runtime" message. The
+analyzer is dependency-injected (`create_app(analyzer=...)`), so it is covered in
+tests with a fake and swappable for other engines.
 
 **Click-to-track (SAM 2).** On the game page you can also type a label, enable
 click mode, and click an object in the video to follow it through the whole clip
