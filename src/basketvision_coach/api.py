@@ -14,6 +14,12 @@ from basketvision_coach.analysis import (
     load_default_analyzer,
     run_analysis,
 )
+from basketvision_coach.analysis_store import (
+    load_analysis,
+    restore_into_store,
+    save_analysis,
+    snapshot,
+)
 from basketvision_coach.click_track import (
     ClickPrompt,
     ClickTracker,
@@ -524,6 +530,22 @@ def create_app(
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except Exception as exc:  # surface the real inference error to the UI
             raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}") from exc
+        # Persist the run so it survives restarts and can be reloaded/edited
+        # without re-running YOLO.
+        save_analysis(
+            video_service.data_root,
+            video_id,
+            snapshot(
+                store,
+                video_id=video_id,
+                detection_run_id=result.detection_run_id,
+                tracking_run_id=result.tracking_run_id,
+                source_width=result.source_width,
+                source_height=result.source_height,
+                fps=result.fps,
+                engine=result.engine,
+            ),
+        )
         return AnalysisRead(
             detection_run_id=result.detection_run_id,
             tracking_run_id=result.tracking_run_id,
@@ -533,6 +555,35 @@ def create_app(
             frame_count=result.frame_count,
             object_count=result.object_count,
             engine=result.engine,
+        )
+
+    @app.get("/api/videos/{video_id}/analysis-available")
+    def analysis_status(video_id: int) -> dict[str, object]:
+        payload = load_analysis(video_service.data_root, video_id)
+        if payload is None:
+            return {"available": False}
+        return {
+            "available": True,
+            "engine": payload.get("engine"),
+            "object_count": payload.get("object_count"),
+            "frame_count": payload.get("frame_count"),
+        }
+
+    @app.post("/api/videos/{video_id}/restore-analysis", response_model=AnalysisRead)
+    def restore_analysis(video_id: int) -> AnalysisRead:
+        payload = load_analysis(video_service.data_root, video_id)
+        if payload is None:
+            raise HTTPException(status_code=404, detail="No saved analysis for this video")
+        detection_run_id, tracking_run_id = restore_into_store(store, payload)
+        return AnalysisRead(
+            detection_run_id=detection_run_id,
+            tracking_run_id=tracking_run_id,
+            source_width=float(payload.get("source_width", 0.0)),
+            source_height=float(payload.get("source_height", 0.0)),
+            fps=float(payload.get("fps", 0.0)),
+            frame_count=int(payload.get("frame_count", 0)),
+            object_count=int(payload.get("object_count", 0)),
+            engine=str(payload.get("engine", "restored")),
         )
 
     @app.get("/api/videos/{video_id}/overlay.mp4")

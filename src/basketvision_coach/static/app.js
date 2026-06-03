@@ -56,6 +56,8 @@ window.bvGamePage = function (config) {
     clickTracking: false,
     samples: [],
     selectedSample: "",
+    exporting: false,
+    hasSavedAnalysis: false,
 
     fmt: fmtNumber,
 
@@ -77,7 +79,10 @@ window.bvGamePage = function (config) {
     },
 
     async init() {
-      if (this.videoId) await this.refresh();
+      if (this.videoId) {
+        await this.refresh();
+        await this.checkSavedAnalysis();
+      }
       try {
         const res = await fetch("/api/samples");
         if (res.ok) {
@@ -287,6 +292,63 @@ window.bvGamePage = function (config) {
       return `/api/videos/${this.videoId}/overlay.mp4?${p.toString()}`;
     },
 
+    async downloadOverlay() {
+      if (!this.overlayDownloadUrl) return;
+      this.exporting = true;
+      this.error = "";
+      try {
+        const res = await fetch(this.overlayDownloadUrl);
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.detail || `Export failed (${res.status})`);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `annotated_${this.videoId}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        this.error = String(e.message || e);
+      } finally {
+        this.exporting = false;
+      }
+    },
+
+    async checkSavedAnalysis() {
+      try {
+        const res = await fetch(`/api/videos/${this.videoId}/analysis-available`);
+        if (res.ok) this.hasSavedAnalysis = (await res.json()).available === true;
+      } catch (e) {
+        /* optional */
+      }
+    },
+
+    async loadSavedAnalysis() {
+      this.analyzing = true;
+      this.error = "";
+      try {
+        const res = await fetch(`/api/videos/${this.videoId}/restore-analysis`, { method: "POST" });
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.detail || `Load failed (${res.status})`);
+        }
+        const body = await res.json();
+        this.sourceW = body.source_width;
+        this.sourceH = body.source_height;
+        this.overlayFps = body.fps;
+        this.engineNote = `${body.engine} (saved): ${body.object_count} detections`;
+        await this.loadRunPair(body.detection_run_id, body.tracking_run_id);
+      } catch (e) {
+        this.error = String(e.message || e);
+      } finally {
+        this.analyzing = false;
+      }
+    },
+
     async runAnalysis() {
       this.analyzing = true;
       this.error = "";
@@ -301,6 +363,7 @@ window.bvGamePage = function (config) {
         this.sourceH = body.source_height;
         this.overlayFps = body.fps;
         this.engineNote = `${body.engine}: ${body.object_count} detections across ${body.frame_count} frames`;
+        this.hasSavedAnalysis = true;
         await this.loadRunPair(body.detection_run_id, body.tracking_run_id);
       } catch (e) {
         this.error = String(e.message || e);

@@ -70,6 +70,8 @@
       <div class="demo-bar">
         <button @click="runAnalysis()" :disabled="analyzing"
                 x-text="analyzing ? 'Analyzing…' : '▶ Run analysis (YOLO)'"></button>
+        <button class="secondary" x-show="hasSavedAnalysis" @click="loadSavedAnalysis()"
+                :disabled="analyzing">↺ Load saved analysis</button>
         <button class="secondary" @click="runDemo()" :disabled="demoRunning"
                 x-text="demoRunning ? 'Analyzing…' : 'Run demo (synthetic)'"></button>
         <span class="muted" x-text="engineNote"></span>
@@ -85,7 +87,8 @@
       </div>
 
       <div class="demo-bar" x-show="hasOverlayData">
-        <a class="button-link" :href="overlayDownloadUrl" download>⬇ Download annotated video</a>
+        <button @click="downloadOverlay()" :disabled="exporting"
+                x-text="exporting ? 'Rendering…' : '⬇ Download annotated video'"></button>
         <span class="muted">
           Burns the checked layers into the video (best with a real YOLO run;
           may take a while for long clips).
