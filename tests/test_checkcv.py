@@ -47,7 +47,7 @@ def test_check_path_env_config_is_warn(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_run_checks_and_main(capsys: pytest.CaptureFixture[str]) -> None:
     checks = run_checks()
     labels = {c.label for c in checks}
-    assert {"resolved device", "torch", "ultralytics (YOLO)", "sam2"} <= labels
+    assert {"resolved device", "torch", "ultralytics (YOLO)", "lap (tracker)", "sam2"} <= labels
 
     assert main() == 0
     out = capsys.readouterr().out

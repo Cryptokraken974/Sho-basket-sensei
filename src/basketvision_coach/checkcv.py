@@ -1,7 +1,7 @@
 """CV preflight check: ``uv run python -m basketvision_coach.checkcv``.
 
 Reports the resolved torch device and whether the optional CV runtime
-(torch / ultralytics / opencv / sam2) and the configured SAM 2 checkpoint/config
+(torch / ultralytics / opencv / lap / sam2) and the configured SAM 2 checkpoint/config
 are available — so the YOLO and click-to-track features can be validated in one
 command before launching the server.
 """
@@ -80,9 +80,18 @@ def run_checks() -> list[Check]:
         check_module(
             "ultralytics",
             "ultralytics (YOLO)",
-            "uv pip install ultralytics opencv-python-headless",
+            "uv pip install --python .venv/bin/python ultralytics opencv-python-headless torch lap",
         ),
-        check_module("cv2", "opencv (cv2)", "uv pip install opencv-python-headless"),
+        check_module(
+            "cv2",
+            "opencv (cv2)",
+            "uv pip install --python .venv/bin/python opencv-python-headless",
+        ),
+        check_module(
+            "lap",
+            "lap (tracker)",
+            "uv pip install --python .venv/bin/python lap",
+        ),
         check_module(
             "sam2",
             "sam2",
@@ -106,7 +115,11 @@ def main() -> int:
         if check.hint and check.status != "ok":
             print(f"      → {check.hint}")
 
-    yolo_ready = _installed(checks, "torch") and _installed(checks, "ultralytics (YOLO)")
+    yolo_ready = (
+        _installed(checks, "torch")
+        and _installed(checks, "ultralytics (YOLO)")
+        and _installed(checks, "lap (tracker)")
+    )
     sam_ready = (
         _installed(checks, "torch")
         and _installed(checks, "sam2")
